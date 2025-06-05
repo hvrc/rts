@@ -1,13 +1,12 @@
 import React from 'react';
 import { useState, useRef, useEffect } from 'react';
-import './ChatBox.css';  // Add this import
+import './ChatBox.css';
 
 interface Message {
   text: string;
   isUser: boolean;
 }
 
-// Add these interfaces at the top
 interface WordState {
   word: string;
   opacity: number;
@@ -33,8 +32,9 @@ function ChatBox() {
   const [isAnimating, setIsAnimating] = useState(false);
   const [serverData, setServerData] = useState<ServerResponse | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const latestBotMessageRef = useRef<HTMLDivElement>(null); // Ref for the latest bot message
+  const latestBotMessageRef = useRef<HTMLDivElement>(null);
   const chatBoxRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -65,12 +65,9 @@ function ChatBox() {
       }
 
       const data: ServerResponse = await response.json();
-      setServerData(data); // Store the server response
-      
-      // Log the complete response for debugging
+      setServerData(data);
       console.log('Server Response:', data);
       
-      // Set train of thought if available
       if (data.train_of_thought && Array.isArray(data.train_of_thought)) {
         if (data.train_of_thought.length > 0) {
           setCurrentTrainOfThought(data.train_of_thought[0]);
@@ -89,12 +86,11 @@ function ChatBox() {
         text: "Sorry, I encountered an error. Please try again.", 
         isUser: false 
       }]);
-      setCurrentTrainOfThought([]); // Clear train of thought on error
+      setCurrentTrainOfThought([]);
     }
   };
 
   React.useEffect(() => {
-    // Reset game when component mounts
     fetch('http://localhost:5000/reset', {
       method: 'POST',
     })
@@ -102,12 +98,11 @@ function ChatBox() {
     .catch(error => console.error('Error resetting game:', error));
   }, []);
 
-  // Update positions when train of thought changes
   useEffect(() => {
     if (currentTrainOfThought.length > 0) {
       const newPositions = currentTrainOfThought.map(() => ({
-        x: Math.random() * 210,
-        y: Math.random() * 400,
+        x: Math.random() * 260 - 35, // Span messages-container width (280px - 10px padding on each side)
+        y: Math.random() * 430, // Span messages-container height (approx 430px)
         rotate: Math.random() * 30 - 15,
         scale: 0.8 + Math.random() * 0.4
       }));
@@ -115,7 +110,6 @@ function ChatBox() {
     }
   }, [currentTrainOfThought]);
 
-  // Update the animation effect
   useEffect(() => {
     if (!serverData?.train_of_thought || !Array.isArray(serverData.train_of_thought)) return;
     
@@ -123,23 +117,20 @@ function ChatBox() {
       setIsAnimating(true);
       const seenWords = new Set<string>();
       
-      // Process each list in sequence
       for (let i = 0; i < serverData.train_of_thought.length - 1; i++) {
         const currentList = serverData.train_of_thought[i];
         const nextList = serverData.train_of_thought[i + 1];
 
-        // First list: fade in words one by one
         if (i === 0) {
           const positions = new Map(
             currentList.map(word => [word, {
-              x: Math.random() * 210,     // Reduced from 240 to 220 and offset by -20
-              y: Math.random() * 400,     // Keep vertical range the same
+              x: Math.random() * 260 - 35, // Span messages-container width
+              y: Math.random() * 430, // Span messages-container height
               rotate: Math.random() * 30 - 15,
               scale: 0.9 + Math.random() * 0.2
             }])
           );
 
-          // Set all words initially with opacity 0
           setAnimatingWords(
             currentList.map(word => ({
               word,
@@ -148,10 +139,8 @@ function ChatBox() {
             }))
           );
 
-          // Wait for initial render
           await new Promise(resolve => setTimeout(resolve, 50));
 
-          // Fade in words one by one
           for (let j = 0; j < currentList.length; j++) {
             setAnimatingWords(prev => 
               prev.map((w, index) => 
@@ -164,7 +153,6 @@ function ChatBox() {
           await new Promise(resolve => setTimeout(resolve, 50));
         }
 
-        // Keep the existing logic for word removal
         const wordsToRemove = currentList.filter(word => !nextList.includes(word));
         
         for (const word of wordsToRemove) {
@@ -187,63 +175,59 @@ function ChatBox() {
     };
   }, [serverData?.train_of_thought]);
 
-  // Update the train of thought container styles
   return (
     <div style={{ 
       position: 'absolute',
       width: '280px',
     }}>
-      {/* Chat box with train of thought overlay */}
       <div 
         ref={chatBoxRef}
         style={{ 
-          width: '100%',
+          width: '280px',
           height: '480px',
           display: 'flex',
           flexDirection: 'column',
-          position: 'relative' // Add this for absolute positioning context
+          position: 'relative'
         }}
       >
-        {/* Train of thought overlay */}
-        {isAnimating && (
-          <div className="train-of-thought" style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            pointerEvents: 'none',
-            zIndex: 2,
-            paddingTop: '0' // Match messages-container padding
-          }}>
-            {animatingWords.map((wordState, index) => (
-              <div
-                key={`${wordState.word}-${index}`}
-                style={{
-                  position: 'absolute',
-                  left: '0',
-                  top: '0',
-                  padding: '2px 4px',
-                  fontSize: '12px',
-                  color: '#666',
-                  whiteSpace: 'nowrap',
-                  transform: `translate(${
-                    Math.min(Math.max(wordState.position.x - 20, 0), 220) // Subtract 20 from x position
-                  }px, ${
-                    Math.min(Math.max(wordState.position.y, 0), 400)
-                  }px) rotate(${wordState.position.rotate}deg) scale(${wordState.position.scale})`,
-                  opacity: wordState.opacity,
-                  transition: 'opacity 0.3s ease, transform 0.3s ease',
-                }}
-              >
-                {wordState.word}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Messages container */}
-        <div className="messages-container">
+        <div 
+          ref={messagesContainerRef} 
+          className="messages-container"
+        >
+          {isAnimating && (
+            <div className="train-of-thought" style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%', // Match messages-container width
+              height: '100%', // Match messages-container height
+              pointerEvents: 'none',
+              zIndex: 10, // Render in front of messages
+              padding: '10px' // Match messages-container padding
+            }}>
+              {animatingWords.map((wordState, index) => (
+                <div
+                  key={`${wordState.word}-${index}`}
+                  style={{
+                    position: 'absolute',
+                    padding: '2px 4px',
+                    fontSize: '12px',
+                    color: '#666',
+                    whiteSpace: 'nowrap',
+                    transform: `translate(${
+                      Math.min(Math.max(wordState.position.x, 0), 260) // Constrain to content area
+                    }px, ${
+                      Math.min(Math.max(wordState.position.y, 0), 430) // Constrain to content area
+                    }px) rotate(${wordState.position.rotate}deg) scale(${wordState.position.scale})`,
+                    opacity: wordState.opacity,
+                    transition: 'opacity 0.3s ease, transform 0.3s ease',
+                  }}
+                >
+                  {wordState.word}
+                </div>
+              ))}
+            </div>
+          )}
           {messages.map((message, index) => (
             <div
               key={index}
@@ -274,7 +258,7 @@ function ChatBox() {
             gap: '8px',
             padding: '10px',
             position: 'relative',
-            zIndex: 3 // Keep form above words
+            zIndex: 3
           }}
         >
           <input
