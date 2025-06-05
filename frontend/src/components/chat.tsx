@@ -1,6 +1,7 @@
 import React from 'react';
 import { useState, useRef, useEffect } from 'react';
 import './chat.css';
+import Logo from './Logo';
 
 interface Message {
   text: string;
@@ -294,6 +295,7 @@ function Chat() {
       position: 'absolute',
       width: '280px',
     }}>
+      <Logo />
       <div 
         ref={chatBoxRef}
         style={{ 
