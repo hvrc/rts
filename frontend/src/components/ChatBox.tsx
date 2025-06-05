@@ -32,6 +32,8 @@ function ChatBox() {
   const [isAnimating, setIsAnimating] = useState(false);
   const [serverData, setServerData] = useState<ServerResponse | null>(null);
   const [isTyping, setIsTyping] = useState(false); // New state for tracking typing indicator
+  const [animatedText, setAnimatedText] = useState("");
+  const [isTextAnimating, setIsTextAnimating] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const latestBotMessageRef = useRef<HTMLDivElement>(null);
   const chatBoxRef = useRef<HTMLDivElement>(null);
@@ -45,10 +47,12 @@ function ChatBox() {
     scrollToBottom();
   }, [messages]);
 
+  // Update the handleSubmit function
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
 
+    // Add user message
     setMessages(prev => [...prev, { text: inputText, isUser: true }]);
     setInputText('');
     
@@ -67,8 +71,26 @@ function ChatBox() {
 
       const data: ServerResponse = await response.json();
       setServerData(data);
-      console.log('Server Response:', data);
       
+      // Add bot message with final text (will be hidden during animation)
+      setMessages(prev => [...prev, { text: data.response, isUser: false }]);
+      
+      // Handle animation sequence
+      if (data.train_of_thought && data.train_of_thought.length > 0) {
+        setIsTyping(true); // Show typing indicator first
+      } else {
+        // For messages without train of thought, just animate text
+        setIsTextAnimating(true);
+        setAnimatedText("");
+        
+        for (let i = 0; i < data.response.length; i++) {
+          setAnimatedText(prev => prev + data.response[i]);
+          await new Promise(resolve => setTimeout(resolve, 25));
+        }
+        
+        setIsTextAnimating(false);
+      }
+
       if (data.train_of_thought && Array.isArray(data.train_of_thought)) {
         if (data.train_of_thought.length > 0) {
           setCurrentTrainOfThought(data.train_of_thought[0]);
@@ -76,17 +98,10 @@ function ChatBox() {
           setCurrentTrainOfThought([]);
         }
       }
-
-      setMessages(prev => [...prev, { 
-        text: data.response || "Sorry, something went wrong", 
-        isUser: false 
-      }]);
     } catch (error) {
       console.error('Error:', error);
-      setMessages(prev => [...prev, { 
-        text: "Sorry, I encountered an error. Please try again.", 
-        isUser: false 
-      }]);
+      const errorMessage = "Sorry, I encountered an error. Please try again.";
+      setMessages(prev => [...prev, { text: errorMessage, isUser: false }]);
       setCurrentTrainOfThought([]);
     }
   };
@@ -175,7 +190,10 @@ function ChatBox() {
           await new Promise(resolve => setTimeout(resolve, 500));
           setIsTyping(false); // Stop typing indicator
           
-          // Wait a moment after showing response, then fade out last word
+          // Animate the bot's response character by character
+          await animateText(messages[messages.length - 1].text);
+          
+          // Wait a moment after text animation, then fade out last word
           await new Promise(resolve => setTimeout(resolve, 300));
           setAnimatingWords(prev => 
             prev.map(w => ({
@@ -195,6 +213,26 @@ function ChatBox() {
       setIsTyping(false);
     };
   }, [serverData?.train_of_thought]);
+
+  // Update the animateText function
+  const animateText = async (text: string) => {
+    setIsTextAnimating(true);
+    setAnimatedText("");
+    
+    for (let i = 0; i < text.length; i++) {
+      setAnimatedText(prev => prev + text[i]);
+      await new Promise(resolve => setTimeout(resolve, 25)); // Changed from 10ms to 50ms
+    }
+    
+    // Update the actual message text after animation
+    setMessages(prev => {
+      const newMessages = [...prev];
+      newMessages[newMessages.length - 1].text = text;
+      return newMessages;
+    });
+    
+    setIsTextAnimating(false);
+  };
 
   return (
     <div style={{ 
@@ -265,21 +303,38 @@ function ChatBox() {
                 marginBottom: '10px'
               }}
             >
-              <div style={{
-                maxWidth: '100%',
-                padding: '8px 12px',
-                borderRadius: '12px',
-                backgroundColor: message.isUser ? '#FFAC1C' : '#E9E9EB',
-                color: message.isUser ? 'white' : 'black'
-              }}>
-                {(!message.isUser && index === messages.length - 1 && isTyping) ? (
-                  <div className="typing-indicator">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                  </div>
-                ) : message.text}
-              </div>
+              {(!message.isUser && index === messages.length - 1) ? (
+                <div style={{
+                  maxWidth: '100%',
+                  padding: '8px 12px',
+                  borderRadius: '12px',
+                  backgroundColor: '#E9E9EB',
+                  color: 'black'
+                }}>
+                  {(isTyping && serverData?.train_of_thought?.length) ? (
+                    <div className="typing-indicator">
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                    </div>
+                  ) : isTextAnimating ? (
+                    animatedText
+                  ) : (
+                    message.text // This will show after animation completes
+                  )}
+                </div>
+              ) : (
+                // User messages remain unchanged
+                <div style={{
+                  maxWidth: '100%',
+                  padding: '8px 12px',
+                  borderRadius: '12px',
+                  backgroundColor: message.isUser ? '#FFAC1C' : '#E9E9EB',
+                  color: message.isUser ? 'white' : 'black'
+                }}>
+                  {message.text}
+                </div>
+              )}
             </div>
           ))}
           <div ref={messagesEndRef} />
