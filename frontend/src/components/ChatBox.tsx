@@ -303,28 +303,12 @@ function ChatBox() {
                 marginBottom: '10px'
               }}
             >
-              {(!message.isUser && index === messages.length - 1) ? (
-                <div style={{
-                  maxWidth: '100%',
-                  padding: '8px 12px',
-                  borderRadius: '12px',
-                  backgroundColor: '#E9E9EB',
-                  color: 'black'
-                }}>
-                  {(isTyping && serverData?.train_of_thought?.length) ? (
-                    <div className="typing-indicator">
-                      <span></span>
-                      <span></span>
-                      <span></span>
-                    </div>
-                  ) : isTextAnimating ? (
-                    animatedText
-                  ) : (
-                    message.text // This will show after animation completes
-                  )}
-                </div>
-              ) : (
-                // User messages remain unchanged
+              <div style={{ position: 'relative' }}>
+                {message.isUser && (
+                  <div className="question-mark-circle">
+                    ?
+                  </div>
+                )}
                 <div style={{
                   maxWidth: '100%',
                   padding: '8px 12px',
@@ -332,9 +316,23 @@ function ChatBox() {
                   backgroundColor: message.isUser ? '#FFAC1C' : '#E9E9EB',
                   color: message.isUser ? 'white' : 'black'
                 }}>
-                  {message.text}
+                  {(!message.isUser && index === messages.length - 1) ? (
+                    isTyping ? (
+                      <div className="typing-indicator">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                      </div>
+                    ) : isTextAnimating ? (
+                      animatedText
+                    ) : (
+                      message.text
+                    )
+                  ) : (
+                    message.text
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           ))}
           <div ref={messagesEndRef} />
