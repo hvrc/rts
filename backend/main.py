@@ -9,13 +9,12 @@ nltk.download('wordnet')
 nltk.download('averaged_perceptron_tagger')
 
 # Game thresholds
-PLAYER_THRESHOLD = 0.01  # 1% similarity threshold for player's words
-AI_THRESHOLD = 0.98      # 98% similarity for AI's words
+PLAYER_THRESHOLD = 0.20  # 1% similarity threshold for player's words
+AI_THRESHOLD = 0.90      # 98% similarity for AI's words
 SIMILARITY_THRESHOLD = 0.2  # Base similarity threshold
 SISTER_TERM_THRESHOLD = 0.5  # Minimum similarity for sister terms
 
 # Word scoring weights
-LENGTH_SCORE_WEIGHT = 0.3
 COMMON_WORD_SCORE = 0.7
 DIRECT_RELATION_BOOST = 1.5
 
@@ -61,7 +60,7 @@ TECHNICAL_TERMS = {
 COMMON_WORDS = {
     'dog', 'cat', 'house', 'book', 'food', 'water', 'bed', 'chair', 'phone', 'car',
     'door', 'box', 'cup', 'desk', 'bird', 'fish', 'hand', 'key', 'milk', 'paper',
-    'coin', 'glass', 'mouth', 'nose', 'ball', 'eye'
+    'coin', 'glass', 'mouth', 'nose', 'ball', 'eye', 'beach'  # Added beach
 }
 
 PROPER_NOUNS = {
@@ -125,9 +124,7 @@ def is_valid_word(word):
     if word.lower()[0] in ['r', 't', 's']:
         return False, "Word cannot start with R, T, or S"
     
-    if not is_concrete_noun(word.lower()):
-        return False, "Word must be a concrete noun"
-    
+    # Remove concrete noun check for player's words
     return True, "Valid word"
 
 def are_words_related(word1, word2):
@@ -165,14 +162,22 @@ def get_related_word(word):
     return random.choice(valid_words) if valid_words else None
 
 def get_word_frequency_score(word):
-    """Get a score for word commonness (0-1, higher means more common)."""
-    length_score = 0.3 / (len(word) + 1)
-    common_word_score = 0.7 if word.lower() in COMMON_WORDS else 0
-    return length_score + common_word_score
+    """Get a score for word commonness and concreteness (0-2, higher means better)."""
+    base_score = 1.0 if word.lower() in COMMON_WORDS else 0
+    
+    # Add bonus for concrete nouns but don't eliminate abstract ones
+    if is_concrete_noun(word):
+        base_score += 1.0
+        
+    return base_score
 
 def get_related_word_with_reason(word):
     """Find a related word and the reason for relation."""
     synsets = wordnet.synsets(word, pos=wordnet.NOUN)
+    
+    if not synsets:
+        return None
+        
     all_related_words = []
     
     for synset in synsets:
@@ -209,27 +214,51 @@ def get_related_word_with_reason(word):
                                 'relation_type': 'sister'
                             })
     
+    # Remove concrete noun check from validation
     valid_words = [w for w in all_related_words 
                    if not w['word'].startswith(('r', 'R', 't', 'T', 's', 'S'))
                    and '_' not in w['word']
-                   and is_valid_word(w['word'])[0]]
+                   and is_valid_word(w['word'])[0]
+                   and not is_word_contained(w['word'], word)]  # Add existing function check
     
     if not valid_words:
         return None
     
+    # Sort by relationship type and score
     valid_words.sort(key=lambda x: (
         x['relation_type'] in ['hypernym', 'hyponym'],
         x['score']
     ), reverse=True)
     
-    top_words = valid_words[:3] if len(valid_words) > 3 else valid_words
-    return random.choice(top_words) if top_words else None
+    # Take top 50 candidates instead of 25
+    candidates = valid_words[:50] if len(valid_words) > 50 else valid_words
+    
+    # Initialize best word tracking
+    best_word = None
+    best_similarity = -1
+    best_combined_score = -1
+
+    # Check each candidate thoroughly
+    for candidate in candidates:
+        if (candidate['word'].lower() not in game_state.word_history and 
+            not is_word_contained(candidate['word'], word)):
+            is_related, similarity = are_words_related(word, candidate['word'])
+            frequency_score = get_word_frequency_score(candidate['word'])
+            # Update weights: 60% similarity, 40% frequency
+            combined_score = (similarity * 0.6) + (frequency_score * 0.4)
+            
+            if combined_score > best_combined_score:
+                best_word = candidate
+                best_similarity = similarity
+                best_combined_score = combined_score
+                
+    return best_word
 
 def get_word_definition(word):
     """Get all noun definitions of a word, ranked by commonness and concreteness."""
     synsets = wordnet.synsets(word, pos=wordnet.NOUN)
     if not synsets:
-        return "No definitions found."
+        return "I actually don't know what that means"
     
     scored_defs = []
     for synset in synsets:
@@ -310,7 +339,7 @@ def is_word_contained(word1, word2):
 def format_response(message):
     """Handle game logic and format response."""
     if not message or not message.strip():
-        return {'response': 'Please enter a word'}
+        return {'response': '?'}
     
     message = message.strip().lower()
     
@@ -322,50 +351,50 @@ def format_response(message):
                 game_state.last_reason
             )
             return {'response': contextual_def}
-        return {'response': "No previous word to explain."}
+        return {'response': "How what?"}
     
     if message == "define":
         if game_state.last_word:
             definitions = get_word_definition(game_state.last_word)
-            return {'response': f"'{game_state.last_word}':\n{definitions}"}
-        return {'response': "No previous word to define."}
+            return {'response': f"{definitions}"}
+        return {'response': "Define what?"}
     
     if message == "reset":
         game_state.reset()
-        return {'response': "Game reset! Word history cleared. Start with a new word."}
+        return {'response': "alright, give me a word"}
     
     if not game_state.add_word(message):
-        return {'response': f"'{message}' has already been used in this game. Try a different word!"}
+        return {'response': f"'{message}' was used already"}
     
     is_valid, reason = is_valid_word(message)
     if not is_valid:
         game_state.word_history.remove(message)
-        return {'response': f"Invalid word: {reason}"}
+        return {'response': f"I don't know what {reason} means"}
     
     if game_state.last_word:
         if message == game_state.last_word:
-            return {'response': f"'{message}' is the exact same word as '{game_state.last_word}'. Try a different word!"}
+            return {'response': f"'{message}' was just used"}
         if is_word_contained(message, game_state.last_word):
-            return {'response': f"Your word '{message}' contains or is contained within '{game_state.last_word}'. Try a different word!"}
+            return {'response': f"'{message}' '{game_state.last_word}'"}
             
         is_related, similarity = are_words_related(game_state.last_word, message)
         if similarity < PLAYER_THRESHOLD:
             game_state.word_history.remove(message)
             return {
-                'response': f"Your word '{message}' is not related to '{game_state.last_word}' "
-                           f"(similarity: {int(similarity * 100)}%, needed: {int(PLAYER_THRESHOLD * 100)}%)"
+                'response': f"I don't know how '{message}' relates to '{game_state.last_word}' "
             }
     
+    # Bot still uses concrete nouns for responses
     related = get_related_word_with_reason(message)
     if not related:
         game_state.reset()
-        return {'response': "I can't think of a related word. You win! Game reset."}
+        return {'response': "I can't think of a word... give me a new one 1"}
     
     best_related = related
     best_similarity = 0
     best_combined_score = 0
     
-    for _ in range(25):
+    for _ in range(50):
         new_related = get_related_word_with_reason(message)
         if new_related and new_related['word'].lower() not in game_state.word_history:
             is_related, similarity = are_words_related(message, new_related['word'])
@@ -379,13 +408,10 @@ def format_response(message):
                 best_related = new_related
                 best_similarity = similarity
                 best_combined_score = combined_score
-                
-            if similarity >= AI_THRESHOLD and frequency_score >= 0.5:
-                break
     
     if best_related['word'].lower() in game_state.word_history:
         game_state.reset()
-        return {'response': "All related words have been used. Game reset!"}
+        return {'response': "Damn, I can't think of a word... give me a new one 2"}
     
     game_state.add_word(best_related['word'])
     game_state.last_word = best_related['word']
