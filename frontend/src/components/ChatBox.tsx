@@ -25,9 +25,8 @@ function ChatBox() {
     if (!inputText.trim()) return;
 
     setMessages(prev => [...prev, { text: inputText, isUser: true }]);
-
-    
     setInputText('');
+    
     try {
       const response = await fetch('http://localhost:5000/echo', {
         method: 'POST',
@@ -37,13 +36,23 @@ function ChatBox() {
         body: JSON.stringify({ message: inputText }),
       });
 
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
+      
+      // Log the entire response data
+      console.log('Server Response:', {
+        word: inputText,
+        response: data.response,
+        train_of_thought: data.train_of_thought
+      });
+
       setMessages(prev => [...prev, { text: data.response, isUser: false }]);
     } catch (error) {
       console.error('Error:', error);
     }
-
-    
   };
 
   React.useEffect(() => {

@@ -218,9 +218,7 @@ def score_word(word, original_word, relation_type, similarity):
     
     return score
 
-def get_best_related_word(word):
-    train_of_thought = []
-    
+def get_best_related_word(word, train_of_thought):
     # 1. Get all raw words and related words
     related_objects = get_related_words(word)
     all_words = list(set(w['word'].replace('_', '') for w in related_objects))
@@ -278,13 +276,6 @@ def get_best_related_word(word):
     # Final selected word
     selected_word = [scored_words[0]['word']]
     train_of_thought.append(selected_word)
-    
-    # Print train of thought
-    print(f"\nThinking about: {word}")
-    for words in train_of_thought:
-        for w in words:
-            print(w)
-        print()
     
     return scored_words[0]
 
@@ -385,24 +376,21 @@ def format_response(message):
             return {'response': f"i don't know what relates to {message}. new word pls?"}
     
     # Get and validate best related word
-    best_related = get_best_related_word(message)
+    train_of_thought = []  # Initialize train_of_thought list
+    best_related = get_best_related_word(message, train_of_thought)  # Pass train_of_thought
     if not best_related:
         game_state.word_history.remove(message)
-        return {'response': f"i don't know what relates to {message}. can you give me another word?"}
+        return {
+            'response': f"i don't know what relates to {message}. can you give me another word?",
+            'train_of_thought': []
+        }
     
     game_state.add_word(best_related['word'])
     game_state.last_word = best_related['word']
     game_state.last_reason = best_related['reason']
     game_state.last_similarity = best_related['similarity']
     
-    return {'response': best_related['word']}
-
-def are_words_related(word1, word2):
-    synsets1 = wordnet.synsets(word1, pos=[wordnet.NOUN, wordnet.ADJ])
-    synsets2 = wordnet.synsets(word2, pos=[wordnet.NOUN, wordnet.ADJ])
-    
-    if not synsets1 or not synsets2:
-        return False, 0
-    
-    max_similarity = max((s1.path_similarity(s2) or 0) for s1 in synsets1 for s2 in synsets2)
-    return max_similarity >= SIMILARITY_THRESHOLD, max_similarity
+    return {
+        'response': best_related['word'],
+        'train_of_thought': train_of_thought
+    }

@@ -12,13 +12,28 @@ def home():
 
 @app.route('/echo', methods=['POST'])
 def echo():
-    data = request.json
-    message = data.get('message', '')
-    return jsonify(format_response(message))
+    try:
+        data = request.json
+        message = data.get('message', '')
+        response = format_response(message)
+        return jsonify({
+            'response': response['response'],
+            'train_of_thought': response.get('train_of_thought', [])
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'response': 'Error processing request',
+            'train_of_thought': [],
+            'error': str(e)
+        }), 500
 
 @app.route('/reset', methods=['POST'])
 def reset():
-    return jsonify(format_response('reset'))
+    response = format_response('reset')
+    return jsonify({
+        'response': response['response'],
+        'train_of_thought': []
+    })
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=3000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
