@@ -34,3 +34,25 @@
   scrollbar-width: thin;
   scrollbar-color: #888 transparent;
 }
+
+.train-of-thought {
+  transition: all 0.1s ease;
+  pointer-events: none;
+}
+
+.train-of-thought > div {
+  will-change: opacity, transform;
+  opacity: 0;
+  transition: opacity 0.1s ease-in-out;
+}
+
+/* Separate transition for fade out */
+.train-of-thought > div[style*="opacity: 0"] {
+  transition: opacity 0.1s ease-out;
+}
+
+.train-of-thought > div[style*="opacity: 1"] {
+  opacity: 1;
+  transition-duration: 0.1s, 0.1s; /* Keep faster fade in */
+  transition-timing-function: ease-in, ease-in-out;
+}

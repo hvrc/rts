@@ -325,72 +325,104 @@ def get_contextual_definition(word1, word2, reason):
     return get_word_definition(word2)
 
 def format_response(message):
-    if not message or not message.strip():
-        return {'response': '?'}
-    
-    message = message.strip().lower()
-    
-    if message == "how":
-        if game_state.last_word:
-            contextual_def = get_contextual_definition(message, game_state.last_word, game_state.last_reason)
-            return {'response': contextual_def}
-        return {'response': "how what?"}
-    
-    if message == "define":
-        if game_state.last_word:
-            definitions = get_word_definition(game_state.last_word)
-            return {'response': f"{definitions}"}
-        return {'response': "define what?"}
-    
-    if message == "reset":
-        game_state.reset()
-        return {'response': "alright, give me a word"}
-    
-    # Word Pre-validation
-    if not game_state.add_word(message):
-        return {'response': f"we used {message} already"}
-    
-    is_valid, reason = is_valid_word(message)
-    if not is_valid:
-        game_state.word_history.remove(message)
-        return {'response': f"'{message}' {reason}"}
-    
-    if game_state.last_word:
-        if message == game_state.last_word:
-            return {'response': f"we just used {message}"}
-        if is_word_contained(message, game_state.last_word):
-            return {'response': f"isn't {message} too similar to {game_state.last_word}?"}
+    try:
+        if not message or not message.strip():
+            return {
+                'response': '?',
+                'train_of_thought': []
+            }
         
-        is_related, similarity = are_words_related(message, game_state.last_word)
-        if similarity < PLAYER_THRESHOLD:
-            # Store the previous word before updating
-            previous_word = game_state.last_word
+        message = message.strip().lower()
+        
+        # Special commands
+        if message == "how":
+            if game_state.last_word:
+                contextual_def = get_contextual_definition(message, game_state.last_word, game_state.last_reason)
+                return {'response': contextual_def, 'train_of_thought': []}
+            return {'response': "how what?", 'train_of_thought': []}
+        
+        if message == "define":
+            if game_state.last_word:
+                definitions = get_word_definition(game_state.last_word)
+                return {'response': f"{definitions}", 'train_of_thought': []}
+            return {'response': "define what?", 'train_of_thought': []}
+        
+        if message == "reset":
+            game_state.reset()
+            return {'response': "alright, give me a word", 'train_of_thought': []}
+        
+        # Word Pre-validation
+        if not game_state.add_word(message):
+            return {'response': f"we used {message} already", 'train_of_thought': []}
+        
+        is_valid, reason = is_valid_word(message)
+        if not is_valid:
+            game_state.word_history.remove(message)
+            return {'response': f"'{message}' {reason}", 'train_of_thought': []}
+        
+        train_of_thought = []  # Initialize train_of_thought list
+        
+        if game_state.last_word:
+            if message == game_state.last_word:
+                return {'response': f"we just used {message}", 'train_of_thought': []}
+            if is_word_contained(message, game_state.last_word):
+                return {'response': f"isn't {message} too similar to {game_state.last_word}?", 'train_of_thought': []}
             
-            best_related = get_best_related_word(message)
-            if best_related:
-                game_state.add_word(best_related['word'])
-                game_state.last_word = best_related['word']
-                game_state.last_reason = best_related['reason']
-                game_state.last_similarity = best_related['similarity']
-                return {'response': f"i don't know how {message} relates to {previous_word}. {best_related['word']}"}
-            return {'response': f"i don't know what relates to {message}. new word pls?"}
-    
-    # Get and validate best related word
-    train_of_thought = []  # Initialize train_of_thought list
-    best_related = get_best_related_word(message, train_of_thought)  # Pass train_of_thought
-    if not best_related:
-        game_state.word_history.remove(message)
+            is_related, similarity = are_words_related(message, game_state.last_word)
+            if similarity < PLAYER_THRESHOLD:
+                previous_word = game_state.last_word
+                best_related = get_best_related_word(message, train_of_thought)
+                if best_related:
+                    game_state.add_word(best_related['word'])
+                    game_state.last_word = best_related['word']
+                    game_state.last_reason = best_related['reason']
+                    game_state.last_similarity = best_related['similarity']
+                    return {
+                        'response': f"i don't know how {message} relates to {previous_word}. {best_related['word']}", 
+                        'train_of_thought': train_of_thought
+                    }
+                return {
+                    'response': f"i don't know what relates to {message}. new word pls?",
+                    'train_of_thought': []
+                }
+        
+        best_related = get_best_related_word(message, train_of_thought)
+        if not best_related:
+            game_state.word_history.remove(message)
+            return {
+                'response': f"i don't know what relates to {message}. can you give me another word?",
+                'train_of_thought': []
+            }
+        
+        game_state.add_word(best_related['word'])
+        game_state.last_word = best_related['word']
+        game_state.last_reason = best_related['reason']
+        game_state.last_similarity = best_related['similarity']
+        
         return {
-            'response': f"i don't know what relates to {message}. can you give me another word?",
+            'response': best_related['word'],
+            'train_of_thought': train_of_thought
+        }
+    except Exception as e:
+        print(f"Error in format_response: {str(e)}")  # Log the error
+        return {
+            'response': "Sorry, I had trouble processing that word. Try another?",
             'train_of_thought': []
         }
+
+def are_words_related(word1, word2):
+    """Check if two words are related and return similarity score."""
+    synsets1 = wordnet.synsets(word1, pos=[wordnet.NOUN, wordnet.ADJ])
+    synsets2 = wordnet.synsets(word2, pos=[wordnet.NOUN, wordnet.ADJ])
     
-    game_state.add_word(best_related['word'])
-    game_state.last_word = best_related['word']
-    game_state.last_reason = best_related['reason']
-    game_state.last_similarity = best_related['similarity']
+    if not synsets1 or not synsets2:
+        return False, 0
     
-    return {
-        'response': best_related['word'],
-        'train_of_thought': train_of_thought
-    }
+    # Calculate maximum similarity between any pair of synsets
+    max_similarity = max(
+        (s1.path_similarity(s2) or 0)
+        for s1 in synsets1
+        for s2 in synsets2
+    )
+    
+    return max_similarity >= SIMILARITY_THRESHOLD, max_similarity
