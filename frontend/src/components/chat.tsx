@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState, useRef, useEffect } from 'react';
-import './ChatBox.css';
+import './chat.css';
 
 interface Message {
   text: string;
@@ -25,7 +25,7 @@ interface ServerResponse {
   response_code: string;  // Add this
 }
 
-function ChatBox() {
+function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [currentTrainOfThought, setCurrentTrainOfThought] = useState<string[]>([]);
@@ -389,4 +389,4 @@ function ChatBox() {
   );
 }
 
-export default ChatBox;
+export default Chat;
