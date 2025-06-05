@@ -1,0 +1,36 @@
+.messages-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;     /* Firefox */
+}
+
+/* Chrome, Safari, Edge */
+.messages-container::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.messages-container::-webkit-scrollbar-button {
+  display: none;
+}
+
+.messages-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.messages-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.messages-container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Firefox */
+.messages-container {
+  scrollbar-width: thin;
+  scrollbar-color: #888 transparent;
+}
