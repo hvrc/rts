@@ -34,22 +34,10 @@
 }
 
 .train-of-thought {
-  transition: all 0.1s ease;
   pointerEvents: none;
 }
 
 .train-of-thought > div {
   will-change: opacity, transform;
   opacity: 0;
-  transition: opacity 0.1s ease-in-out;
-}
-
-.train-of-thought > div[style*="opacity: 0"] {
-  transition: opacity 0.1s ease-out;
-}
-
-.train-of-thought > div[style*="opacity: 1"] {
-  opacity: 1;
-  transition-duration: 0.1s, 0.1s;
-  transition-timing-function: ease-in, ease-in-out;
 }

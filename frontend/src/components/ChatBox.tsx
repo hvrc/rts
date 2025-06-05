@@ -110,12 +110,12 @@ function ChatBox() {
     }
   }, [currentTrainOfThought]);
 
+  // Update the animation effect
   useEffect(() => {
     if (!serverData?.train_of_thought || !Array.isArray(serverData.train_of_thought)) return;
     
     const animate = async () => {
       setIsAnimating(true);
-      const seenWords = new Set<string>();
       
       for (let i = 0; i < serverData.train_of_thought.length - 1; i++) {
         const currentList = serverData.train_of_thought[i];
@@ -150,20 +150,27 @@ function ChatBox() {
             await new Promise(resolve => setTimeout(resolve, 50));
           }
 
-          await new Promise(resolve => setTimeout(resolve, 50));
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
 
         const wordsToRemove = currentList.filter(word => !nextList.includes(word));
         
-        for (const word of wordsToRemove) {
-          setAnimatingWords(prev => 
-            prev.map(w => w.word === word ? { ...w, opacity: 0 } : w)
-          );
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
+        if (wordsToRemove.length > 0) {
+          // Fade out words one by one with a delay
+          for (const word of wordsToRemove) {
+            setAnimatingWords(prev => 
+              prev.map(w => ({
+                ...w,
+                opacity: w.word === word ? 0 : w.opacity
+              }))
+            );
+            // Short delay before starting next word's fade out
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
 
-        await new Promise(resolve => setTimeout(resolve, 50));
-        setAnimatingWords(prev => prev.filter(w => nextList.includes(w.word)));
+          // Wait a bit before moving to next thought train
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
       }
     };
 
@@ -215,12 +222,18 @@ function ChatBox() {
                     color: '#666',
                     whiteSpace: 'nowrap',
                     transform: `translate(${
-                      Math.min(Math.max(wordState.position.x, 0), 260) // Constrain to content area
+                      Math.min(Math.max(wordState.position.x, 0), 260)
                     }px, ${
-                      Math.min(Math.max(wordState.position.y, 0), 430) // Constrain to content area
+                      Math.min(Math.max(wordState.position.y, 0), 430)
                     }px) rotate(${wordState.position.rotate}deg) scale(${wordState.position.scale})`,
                     opacity: wordState.opacity,
-                    transition: 'opacity 0.3s ease, transform 0.3s ease',
+                    transition: `opacity ${
+                      wordState.opacity === 0 ? '2s' :  // longer fade out
+                      wordState.opacity === 1 ? '1s' :  // normal fade in
+                      '0.1s'                           // default
+                    } ${
+                      wordState.opacity === 0 ? 'ease-out' : 'ease-in'
+                    }`
                   }}
                 >
                   {wordState.word}
