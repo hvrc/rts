@@ -52,8 +52,8 @@ function ChatBox() {
     e.preventDefault();
     if (!inputText.trim()) return;
 
-    // Add user message
     setMessages(prev => [...prev, { text: inputText, isUser: true }]);
+    const userInput = inputText;
     setInputText('');
     
     try {
@@ -62,47 +62,40 @@ function ChatBox() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: inputText }),
+        body: JSON.stringify({ message: userInput }),
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
       const data: ServerResponse = await response.json();
-      setServerData(data);
       
-      // Add bot message with final text (will be hidden during animation)
+      // Add bot message immediately with empty text
       setMessages(prev => [...prev, { text: data.response, isUser: false }]);
-      
-      // Handle animation sequence
+
       if (data.train_of_thought && data.train_of_thought.length > 0) {
-        setIsTyping(true); // Show typing indicator first
+        // Word response with thought train
+        setServerData(data);
+        setIsTyping(true);
       } else {
-        // For messages without train of thought, just animate text
+        // Error or special response - just animate the text
         setIsTextAnimating(true);
         setAnimatedText("");
         
+        // Animate character by character
         for (let i = 0; i < data.response.length; i++) {
-          setAnimatedText(prev => prev + data.response[i]);
-          await new Promise(resolve => setTimeout(resolve, 25));
+          await new Promise(resolve => setTimeout(resolve, 50));
+          setAnimatedText(data.response.substring(0, i + 1));
         }
         
         setIsTextAnimating(false);
       }
 
-      if (data.train_of_thought && Array.isArray(data.train_of_thought)) {
-        if (data.train_of_thought.length > 0) {
-          setCurrentTrainOfThought(data.train_of_thought[0]);
-        } else {
-          setCurrentTrainOfThought([]);
-        }
-      }
     } catch (error) {
       console.error('Error:', error);
-      const errorMessage = "Sorry, I encountered an error. Please try again.";
-      setMessages(prev => [...prev, { text: errorMessage, isUser: false }]);
-      setCurrentTrainOfThought([]);
+      setMessages(prev => [...prev, { 
+        text: "Sorry, I encountered an error. Please try again.", 
+        isUser: false 
+      }]);
     }
   };
 
@@ -216,12 +209,14 @@ function ChatBox() {
 
   // Update the animateText function
   const animateText = async (text: string) => {
+    if (!text) return;
+    
     setIsTextAnimating(true);
     setAnimatedText("");
     
     for (let i = 0; i < text.length; i++) {
       setAnimatedText(prev => prev + text[i]);
-      await new Promise(resolve => setTimeout(resolve, 25)); // Changed from 10ms to 50ms
+      await new Promise(resolve => setTimeout(resolve, 25));
     }
     
     // Update the actual message text after animation
