@@ -31,6 +31,7 @@ function ChatBox() {
   const [animatingWords, setAnimatingWords] = useState<WordState[]>([]);
   const [isAnimating, setIsAnimating] = useState(false);
   const [serverData, setServerData] = useState<ServerResponse | null>(null);
+  const [isTyping, setIsTyping] = useState(false); // New state for tracking typing indicator
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const latestBotMessageRef = useRef<HTMLDivElement>(null);
   const chatBoxRef = useRef<HTMLDivElement>(null);
@@ -116,6 +117,7 @@ function ChatBox() {
     
     const animate = async () => {
       setIsAnimating(true);
+      setIsTyping(true); // Start typing indicator
       
       for (let i = 0; i < serverData.train_of_thought.length - 1; i++) {
         const currentList = serverData.train_of_thought[i];
@@ -156,7 +158,6 @@ function ChatBox() {
         const wordsToRemove = currentList.filter(word => !nextList.includes(word));
         
         if (wordsToRemove.length > 0) {
-          // Fade out words one by one with a delay
           for (const word of wordsToRemove) {
             setAnimatingWords(prev => 
               prev.map(w => ({
@@ -164,12 +165,24 @@ function ChatBox() {
                 opacity: w.word === word ? 0 : w.opacity
               }))
             );
-            // Short delay before starting next word's fade out
             await new Promise(resolve => setTimeout(resolve, 100));
           }
+        }
 
-          // Wait a bit before moving to next thought train
-          await new Promise(resolve => setTimeout(resolve, 100));
+        // Update the last iteration check in the animation effect
+        if (i === serverData.train_of_thought.length - 2) {
+          // Show the bot response first
+          await new Promise(resolve => setTimeout(resolve, 500));
+          setIsTyping(false); // Stop typing indicator
+          
+          // Wait a moment after showing response, then fade out last word
+          await new Promise(resolve => setTimeout(resolve, 300));
+          setAnimatingWords(prev => 
+            prev.map(w => ({
+              ...w,
+              opacity: 0 // Fade out all remaining words
+            }))
+          );
         }
       }
     };
@@ -179,6 +192,7 @@ function ChatBox() {
     return () => {
       setAnimatingWords([]);
       setIsAnimating(false);
+      setIsTyping(false);
     };
   }, [serverData?.train_of_thought]);
 
@@ -258,7 +272,13 @@ function ChatBox() {
                 backgroundColor: message.isUser ? '#FFAC1C' : '#E9E9EB',
                 color: message.isUser ? 'white' : 'black'
               }}>
-                {message.text}
+                {(!message.isUser && index === messages.length - 1 && isTyping) ? (
+                  <div className="typing-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                ) : message.text}
               </div>
             </div>
           ))}
