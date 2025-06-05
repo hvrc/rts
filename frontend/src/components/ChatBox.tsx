@@ -26,6 +26,8 @@ function ChatBox() {
 
     setMessages(prev => [...prev, { text: inputText, isUser: true }]);
 
+    
+    setInputText('');
     try {
       const response = await fetch('http://localhost:5000/echo', {
         method: 'POST',
@@ -41,7 +43,7 @@ function ChatBox() {
       console.error('Error:', error);
     }
 
-    setInputText('');
+    
   };
 
   React.useEffect(() => {

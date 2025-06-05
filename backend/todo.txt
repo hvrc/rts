@@ -1,12 +1,49 @@
-refactor the code like this
+Word Pre-validation:
 
-bot gets a word eg. dog
-bot finds max 10 parent words (dog is a type of ___)
-bot finds max 10 child words (___ is a type of)
-bot finds max 1 sister words for each parent word (dog and ___ are types of <parent>)
-bot finds max 10 synonyms
-bot finds max 10 closest word net path similiar
+Checks if word is empty
+Checks if word starts with R, T, or S
+Checks if word was used before in game history
+Checks if word is the same as last word
+Checks if word contains or is contained within last word (including plurals/variations)
 
-bot filters out invalid words (rts, cant contain non alpahbet characters, cant be used before, cant be exact same as last word, word substring of previous word or previous word is substring of word)
-bot ranks words based on word net path similarity, hyponyms, hypernyms, sister terms, frequency, concreteness in that order. 
+Word Relationship Search:
 
+Finds max n words with closest WordNet path similarity
+Finds max n child words (hyponyms - "poodle is a type of dog")
+Finds max n parent words (hypernyms - "dog is a type of animal")
+Finds max m sister words for each parent (other types of the same parent - "cat and dog are types of pet")
+Finds max n synonyms (from WordNet lemmas)
+
+Word Filtering:
+
+Removes words starting with R, T, or S
+Removes words containing underscores or non-alphabetic characters
+Removes words used previously in game
+Removes words that are substrings of previous word or vice versa
+removes words that are not nouns or adjectives
+
+Word Scoring and Ranking (in priority order):
+
+WordNet path similarity score (highest weight)
+Hyponym relationship score
+Hypernym relationship score
+Sister term similarity score
+Word frequency/commonness score (from predefined common words list)
+
+Concreteness score based on:
+Word appears in concrete indicators list
+Word's hypernyms connect to concrete root concepts
+Word's definition doesn't contain abstract keywords
+
+Selection and validation:
+
+Returns highest scoring valid word
+
+Additional validation:
+
+Verifies final similarity score meets minimum threshold (0.2)
+For sister terms, checks minimum similarity threshold (0.5)
+Ensures selected word has proper semantic relation to input word
+Verifies word exists in WordNet dictionary as a noun
+Stores reason for relationship
+Updates game state with new word

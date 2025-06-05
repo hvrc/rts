@@ -3,7 +3,7 @@ from flask_cors import CORS
 from main import format_response, game_state
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})  # Allow all origins
 
 @app.route('/')
 def home():
@@ -21,4 +21,4 @@ def reset():
     return jsonify(format_response('reset'))
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=3000, debug=True)
