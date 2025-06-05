@@ -1,0 +1,12 @@
+refactor the code like this
+
+bot gets a word eg. dog
+bot finds max 10 parent words (dog is a type of ___)
+bot finds max 10 child words (___ is a type of)
+bot finds max 1 sister words for each parent word (dog and ___ are types of <parent>)
+bot finds max 10 synonyms
+bot finds max 10 closest word net path similiar
+
+bot filters out invalid words (rts, cant contain non alpahbet characters, cant be used before, cant be exact same as last word, word substring of previous word or previous word is substring of word)
+bot ranks words based on word net path similarity, hyponyms, hypernyms, sister terms, frequency, concreteness in that order. 
+

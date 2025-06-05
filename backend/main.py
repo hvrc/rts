@@ -214,12 +214,12 @@ def get_related_word_with_reason(word):
                                 'relation_type': 'sister'
                             })
     
-    # Remove concrete noun check from validation
+    # Remove concrete noun check from validation AND apply substring check both ways
     valid_words = [w for w in all_related_words 
                    if not w['word'].startswith(('r', 'R', 't', 'T', 's', 'S'))
                    and '_' not in w['word']
                    and is_valid_word(w['word'])[0]
-                   and not is_word_contained(w['word'], word)]  # Add existing function check
+                   and not is_word_contained(word, w['word'])]  # Changed to check both ways
     
     if not valid_words:
         return None
@@ -241,7 +241,7 @@ def get_related_word_with_reason(word):
     # Check each candidate thoroughly
     for candidate in candidates:
         if (candidate['word'].lower() not in game_state.word_history and 
-            not is_word_contained(candidate['word'], word)):
+            not is_word_contained(word, candidate['word'])):  # Changed to check both ways
             is_related, similarity = are_words_related(word, candidate['word'])
             frequency_score = get_word_frequency_score(candidate['word'])
             # Update weights: 60% similarity, 40% frequency
@@ -308,32 +308,42 @@ def is_word_contained(word1, word2):
     """Check if words are the same, variations, or one is part of another."""
     word1, word2 = word1.lower(), word2.lower()
     
-    word1_parts = word1.split()
-    word2_parts = word2.split()
-    
-    for part in word1_parts:
-        if part in word2 or any(part in w for w in word2_parts):
-            return True
-    for part in word2_parts:
-        if part in word1 or any(part in w for w in word1_parts):
-            return True
-    
+    # Direct substring check first
     if word1 in word2 or word2 in word1:
         return True
         
-    if word1.endswith('s') and word1[:-1] == word2:
-        return True
-    if word2.endswith('s') and word2[:-1] == word1:
-        return True
-    if word1.endswith('es') and word1[:-2] == word2:
-        return True
-    if word2.endswith('es') and word2[:-2] == word1:
-        return True
-    if word1.endswith('ies') and word1[:-3] + 'y' == word2:
-        return True
-    if word2.endswith('ies') and word2[:-3] + 'y' == word1:
-        return True
-        
+    word1_parts = word1.split()
+    word2_parts = word2.split()
+    
+    # Part matching
+    for part in word1_parts:
+        if part in word2 or any(part in w or w in part for w in word2_parts):
+            return True
+    for part in word2_parts:
+        if part in word1 or any(part in w or w in part for w in word1_parts):
+            return True
+    
+    # Plural/suffix checks
+    suffixes = [
+        ('s', ''),
+        ('es', ''),
+        ('ies', 'y'),
+        ('ing', ''),
+        ('ed', ''),
+        ('er', ''),
+        ('est', '')
+    ]
+    
+    for suffix, replacement in suffixes:
+        if word1.endswith(suffix):
+            stem1 = word1[:-len(suffix)] + replacement
+            if stem1 == word2 or stem1 in word2 or word2 in stem1:
+                return True
+        if word2.endswith(suffix):
+            stem2 = word2[:-len(suffix)] + replacement
+            if stem2 == word1 or stem2 in word1 or word1 in stem2:
+                return True
+            
     return False
 
 def format_response(message):
@@ -380,8 +390,17 @@ def format_response(message):
         is_related, similarity = are_words_related(game_state.last_word, message)
         if similarity < PLAYER_THRESHOLD:
             game_state.word_history.remove(message)
+            saved_last_word = game_state.last_word  # Save before modifying
+            
+            # Get a related word to the player's word
+            related = get_related_word_with_reason(message)
+            if related:
+                game_state.last_word = None  # Reset last word since this was invalid
+                return {
+                    'response': f"I don't know how '{message}' relates to '{saved_last_word}'. {related['word']}"
+                }
             return {
-                'response': f"I don't know how '{message}' relates to '{game_state.last_word}' "
+                'response': f"I don't know how '{message}' relates to '{saved_last_word}'. Try another word."
             }
     
     # Bot still uses concrete nouns for responses
