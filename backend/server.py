@@ -18,12 +18,14 @@ def echo():
         response = format_response(message)
         return jsonify({
             'response': response['response'],
-            'train_of_thought': response.get('train_of_thought', [])
+            'train_of_thought': response.get('train_of_thought', []),
+            'response_code': response.get('response_code', '')  # Add response code
         }), 200
     except Exception as e:
         return jsonify({
             'response': 'Error processing request',
             'train_of_thought': [],
+            'response_code': 'ERROR',
             'error': str(e)
         }), 500
 

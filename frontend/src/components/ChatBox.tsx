@@ -5,6 +5,7 @@ import './ChatBox.css';
 interface Message {
   text: string;
   isUser: boolean;
+  showQuestionMark?: boolean;  // Add this
 }
 
 interface WordState {
@@ -21,6 +22,7 @@ interface WordState {
 interface ServerResponse {
   response: string;
   train_of_thought: string[][];
+  response_code: string;  // Add this
 }
 
 function ChatBox() {
@@ -52,6 +54,7 @@ function ChatBox() {
     e.preventDefault();
     if (!inputText.trim()) return;
 
+    // Add user message first without question mark
     setMessages(prev => [...prev, { text: inputText, isUser: true }]);
     const userInput = inputText;
     setInputText('');
@@ -68,25 +71,36 @@ function ChatBox() {
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
       const data: ServerResponse = await response.json();
-      
-      // Add bot message immediately with empty text
-      setMessages(prev => [...prev, { text: data.response, isUser: false }]);
 
+      // If response is UNRELATED, update the last user message to show question mark
+      if (data.response_code === 'UNRELATED') {
+        setMessages(prev => {
+          const newMessages = [...prev];
+          // Find the last user message and add question mark
+          for (let i = newMessages.length - 1; i >= 0; i--) {
+            if (newMessages[i].isUser) {
+              newMessages[i].showQuestionMark = true;
+              break;
+            }
+          }
+          return [...newMessages, { text: data.response, isUser: false }];
+        });
+      } else {
+        // Normal bot response without question mark
+        setMessages(prev => [...prev, { text: data.response, isUser: false }]);
+      }
+
+      // Rest of the handling remains the same
       if (data.train_of_thought && data.train_of_thought.length > 0) {
-        // Word response with thought train
         setServerData(data);
         setIsTyping(true);
       } else {
-        // Error or special response - just animate the text
         setIsTextAnimating(true);
         setAnimatedText("");
-        
-        // Animate character by character
         for (let i = 0; i < data.response.length; i++) {
+          setAnimatedText(prev => prev + data.response[i]);
           await new Promise(resolve => setTimeout(resolve, 50));
-          setAnimatedText(data.response.substring(0, i + 1));
         }
-        
         setIsTextAnimating(false);
       }
 
@@ -299,7 +313,7 @@ function ChatBox() {
               }}
             >
               <div style={{ position: 'relative' }}>
-                {message.isUser && (
+                {message.isUser && message.showQuestionMark && ( // Changed from message.isUser to !message.isUser
                   <div className="question-mark-circle">
                     ?
                   </div>

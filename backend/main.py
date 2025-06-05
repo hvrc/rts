@@ -3,6 +3,7 @@ import nltk
 import random
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from config.responses import RESPONSE_CONFIG
 
 # Download required NLTK data
 nltk.download('wordnet')
@@ -67,6 +68,15 @@ COMMON_WORDS = {
     'coin', 'glass', 'mouth', 'nose', 'ball', 'eye', 'beach'
 }
 
+def format_response_with_code(code, **kwargs):
+    """Format response using response code and optional parameters"""
+    response_type = RESPONSE_CONFIG[code]
+    return {
+        'response': response_type['message'].format(**kwargs) if kwargs else response_type['message'],
+        'train_of_thought': kwargs.get('train_of_thought', []),
+        'response_code': code
+    }
+
 class GameState:
     def __init__(self):
         self.reset()
@@ -120,9 +130,9 @@ def is_valid_word(word):
     if word.lower()[0] in ['r', 't', 's']:
         return False, "rts"
     if not word.isalpha():
-        return False, "doesn't sound like a word"
+        return False, f"{word} doesn't count"
     if not is_noun_or_adjective(word):
-        return False, f"doesn't count"
+        return False, f"{word} doesn't count"
     return True, "Valid word"
 
 def is_word_contained(word1, word2):
@@ -327,10 +337,7 @@ def get_contextual_definition(word1, word2, reason):
 def format_response(message):
     try:
         if not message or not message.strip():
-            return {
-                'response': '?',
-                'train_of_thought': []
-            }
+            return format_response_with_code('EMPTY')
         
         message = message.strip().lower()
         
@@ -338,35 +345,37 @@ def format_response(message):
         if message == "how":
             if game_state.last_word:
                 contextual_def = get_contextual_definition(message, game_state.last_word, game_state.last_reason)
-                return {'response': contextual_def, 'train_of_thought': []}
-            return {'response': "how what?", 'train_of_thought': []}
+                return format_response_with_code('CONTEXTUAL_DEF', definition=contextual_def)
+            return format_response_with_code('HOW_WHAT')
         
         if message == "define":
             if game_state.last_word:
                 definitions = get_word_definition(game_state.last_word)
-                return {'response': f"{definitions}", 'train_of_thought': []}
-            return {'response': "define what?", 'train_of_thought': []}
+                return format_response_with_code('DEFINITION', definition=definitions)
+            return format_response_with_code('DEFINE_WHAT')
         
         if message == "reset":
             game_state.reset()
-            return {'response': "alright, give me a word", 'train_of_thought': []}
+            return format_response_with_code('RESET')
         
         # Word Pre-validation
         if not game_state.add_word(message):
-            return {'response': f"we used {message} already", 'train_of_thought': []}
+            return format_response_with_code('DUPLICATE', word=message)
         
         is_valid, reason = is_valid_word(message)
         if not is_valid:
             game_state.word_history.remove(message)
-            return {'response': f"'{message}' {reason}", 'train_of_thought': []}
+            if reason == "rts":
+                return format_response_with_code('RTS')
+            return format_response_with_code('INVALID_WORD')
         
         train_of_thought = []  # Initialize train_of_thought list
         
         if game_state.last_word:
             if message == game_state.last_word:
-                return {'response': f"we just used {message}", 'train_of_thought': []}
+                return format_response_with_code('SAME_WORD', word=message)
             if is_word_contained(message, game_state.last_word):
-                return {'response': f"isn't {message} too similar to {game_state.last_word}?", 'train_of_thought': []}
+                return format_response_with_code('TOO_SIMILAR', word=message, last_word=game_state.last_word)
             
             is_related, similarity = are_words_related(message, game_state.last_word)
             if similarity < PLAYER_THRESHOLD:
@@ -378,8 +387,9 @@ def format_response(message):
                     game_state.last_reason = best_related['reason']
                     game_state.last_similarity = best_related['similarity']
                     return {
-                        'response': f"i don't know how {message} relates to {previous_word}. {best_related['word']}", 
-                        'train_of_thought': train_of_thought
+                        'response': f"{best_related['word']}", 
+                        'train_of_thought': train_of_thought,
+                        'response_code': 'UNRELATED'  # Add this explicitly
                     }
                 return {
                     'response': f"i don't know what relates to {message}. new word pls?",
