@@ -290,12 +290,143 @@ function Chat() {
     setIsTextAnimating(false);
   };
 
+  const HeaderComponent = () => {
+    const buttonContainerStyle = {
+      display: 'flex',
+      gap: '8px',
+      alignItems: 'center',
+      marginRight: '27px',
+      marginTop: '6px'
+    };
+
+    const buttonStyle = {
+      width: '25px',
+      height: '25px',
+      padding: 0,
+      minWidth: '25px',
+      minHeight: '25px',
+      borderRadius: '50%',
+      backgroundColor: '#E9E9EB',
+      color: '#666',
+      border: 'none',
+      outline: 'none',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '14px',
+      transition: 'background-color 0.2s ease',
+      position: 'relative'
+    } as React.CSSProperties;
+
+    const labelStyle = {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      borderRadius: '50%',
+      cursor: 'pointer',
+      transition: 'background-color 0.2s ease'
+    } as React.CSSProperties;
+
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        width: '100%',
+        padding: '4px 10px 16px 30px'
+      }}>
+        <Logo />
+        <div style={buttonContainerStyle}>
+
+          {/* Show thought process button */}
+          <div style={{ position: 'relative' }}>
+            <div style={buttonStyle}>
+              <input
+                type="checkbox"
+                id="thoughtProcessToggle"
+                style={{
+                  opacity: 0,
+                  position: 'absolute',
+                  width: '100%',
+                  height: '100%',
+                  margin: 0,
+                  cursor: 'pointer'
+                }}
+                onChange={(e) => {
+                  const container = e.currentTarget.parentElement;
+                  if (container) {
+                    container.style.backgroundColor = e.currentTarget.checked ? '#89CFF0' : '#E9E9EB';
+                  }
+                }}
+                onMouseOver={(e) => {
+                  const container = e.currentTarget.parentElement;
+                  if (container && !e.currentTarget.checked) {
+                    container.style.backgroundColor = '#D3D3D3';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  const container = e.currentTarget.parentElement;
+                  if (container && !e.currentTarget.checked) {
+                    container.style.backgroundColor = '#E9E9EB';
+                  }
+                }}
+              />
+              <label htmlFor="thoughtProcessToggle" style={labelStyle} title="Show thought process"></label>
+            </div>
+          </div>
+
+          
+          {/* Train of thought button */}
+          <div style={{ position: 'relative' }}>
+            <div style={buttonStyle}>
+              <input
+                type="checkbox"
+                id="trainToggle"
+                style={{
+                  opacity: 0,
+                  position: 'absolute',
+                  width: '100%',
+                  height: '100%',
+                  margin: 0,
+                  cursor: 'pointer'
+                }}
+                onChange={(e) => {
+                  const container = e.currentTarget.parentElement;
+                  if (container) {
+                    container.style.backgroundColor = e.currentTarget.checked ? '#CCCCFF' : '#E9E9EB';
+                  }
+                }}
+                onMouseOver={(e) => {
+                  const container = e.currentTarget.parentElement;
+                  if (container && !e.currentTarget.checked) {
+                    container.style.backgroundColor = '#D3D3D3';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  const container = e.currentTarget.parentElement;
+                  if (container && !e.currentTarget.checked) {
+                    container.style.backgroundColor = '#E9E9EB';
+                  }
+                }}
+              />
+              <label htmlFor="trainToggle" style={labelStyle} title="Train of thought"></label>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ 
       position: 'absolute',
       width: '280px',
     }}>
-      <Logo />
+      <HeaderComponent />
       <div 
         ref={chatBoxRef}
         style={{ 
