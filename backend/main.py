@@ -4,22 +4,20 @@ import random
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
-# Download required NLTK data
 nltk.download('wordnet')
 nltk.download('averaged_perceptron_tagger')
 
-# Game thresholds
-PLAYER_THRESHOLD = 0.20  # Similarity threshold for player's words
-AI_THRESHOLD = 0.90      # Similarity for AI's words
-SIMILARITY_THRESHOLD = 0.2  # Base similarity threshold
-SISTER_TERM_THRESHOLD = 0.5  # Minimum similarity for sister terms
-MAX_RELATED_WORDS = 25   # Max words to consider
-MAX_HYPONYMS = 20        # Max hyponyms
-MAX_HYPERNYMS = 10       # Max hypernyms
-MAX_SISTERS = 3          # Max sister terms per parent
-MAX_SYNONYMS = 5        # Max synonyms
+PLAYER_THRESHOLD = 0.20       # similarity threshold for player's words
+AI_THRESHOLD = 0.90           # similarity for AI's words
+SIMILARITY_THRESHOLD = 0.2    # base similarity threshold
+SISTER_TERM_THRESHOLD = 0.5   # minimum similarity for sister terms
+MAX_RELATED_WORDS = 25        # max words to consider
+MAX_HYPONYMS = 20             # max hyponyms
+MAX_HYPERNYMS = 10            # max hypernyms
+MAX_SISTERS = 3               # max sister terms per parent
+MAX_SYNONYMS = 5              # max synonyms
 
-# Word scoring weights
+# word scoring weights
 SIMILARITY_WEIGHT = 0.4
 HYPONYM_WEIGHT = 0.2
 HYPERNYM_WEIGHT = 0.2
@@ -27,14 +25,14 @@ SISTER_WEIGHT = 0.15
 FREQUENCY_WEIGHT = 0.15
 CONCRETE_WEIGHT = 0.1
 
-# WordNet concrete roots
+# wordnet concrete roots
 CONCRETE_ROOTS = {
     'physical_entity.n.01', 'matter.n.03', 'artifact.n.01', 'natural_object.n.01',
     'organism.n.01', 'plant.n.02', 'animal.n.01', 'substance.n.01', 'food.n.01',
     'object.n.01', 'structure.n.01', 'body_part.n.01'
 }
 
-# Keywords for definition scoring
+# keywords for definition scoring
 ABSTRACT_KEYWORDS = {
     'abstract', 'quality', 'state', 'condition', 'feeling', 'emotion', 'concept',
     'idea', 'activity', 'action', 'process', 'phenomenon', 'manner', 'way', 'belief',
@@ -108,6 +106,7 @@ RESPONSE_CONFIG = {
         'message': "new word pls?",
         'has_train': False
     },
+    
     # 'HOW_WHAT': {
     #     'code': 'HOW_WHAT',
     #     'message': "how what?",
@@ -118,6 +117,7 @@ RESPONSE_CONFIG = {
     #     'message': "define what?",
     #     'has_train': False
     # },
+
     'RESET': {
         'code': 'RESET',
         'message': "alright, give me a word",
@@ -130,8 +130,8 @@ RESPONSE_CONFIG = {
     }
 }
 
+# format response using response code and optional parameters
 def format_response_with_code(code, **kwargs):
-    """Format response using response code and optional parameters"""
     response_type = RESPONSE_CONFIG[code]
     return {
         'response': response_type['message'].format(**kwargs) if kwargs else response_type['message'],
@@ -197,34 +197,31 @@ def is_valid_word(word):
         return False, f"{word} doesn't count"
     return True, "Valid word"
 
+# check if words are variations/forms of each other.
 def is_word_contained(word1, word2):
-    """Check if words are variations/forms of each other."""
     word1, word2 = word1.lower(), word2.lower()
     
-    # Only check exact matches or full word + suffix
     if word1 == word2:
         return True
     
-    # General suffix handling
     suffixes = [
-        ('s', ''),      # plural
-        ('es', ''),     # plural
-        ('ies', 'y'),   # plural
-        ('ing', ''),    # gerund
-        ('ed', ''),     # past tense
-        ('er', ''),     # comparative
-        ('est', '')     # superlative
+        ('s', ''),
+        ('es', ''),
+        ('ies', 'y'),
+        ('ing', ''),
+        ('ed', ''),
+        ('er', ''),
+        ('est', '')
     ]
     
-    # Check if one word is a suffix variation of the other
     for suffix, replacement in suffixes:
         if word1.endswith(suffix):
             stem1 = word1[:-len(suffix)] + replacement
-            if stem1 == word2:  # Only exact matches
+            if stem1 == word2:
                 return True
         if word2.endswith(suffix):
             stem2 = word2[:-len(suffix)] + replacement
-            if stem2 == word1:  # Only exact matches
+            if stem2 == word1:
                 return True
                 
     return False
@@ -235,32 +232,27 @@ def get_related_words(word, train_of_thought=[]):
     raw_words = []
     
     for synset in synsets:
-        # Synonyms
         synonyms = [lemma.name().replace('_', '') for lemma in synset.lemmas()][:MAX_SYNONYMS]
         raw_words.extend(synonyms)
         for w in synonyms:
             related_words.append({'word': w, 'reason': f"is a synonym of {word}", 'relation_type': 'synonym'})
         
-        # Hyponyms
         hyponyms = [hyponym.lemmas()[0].name().replace('_', '') for hyponym in synset.hyponyms()][:MAX_HYPONYMS]
         raw_words.extend(hyponyms)
         for w in hyponyms:
             related_words.append({'word': w, 'reason': f"is a type of {word}", 'relation_type': 'hyponym'})
         
-        # Hypernyms
         hypernyms = [hypernym.lemmas()[0].name().replace('_', '') for hypernym in synset.hypernyms()][:MAX_HYPERNYMS]
         raw_words.extend(hypernyms)
         for w in hypernyms:
             related_words.append({'word': w, 'reason': f"is a more general category than {word}", 'relation_type': 'hypernym'})
         
-        # Sister terms
         for hypernym in synset.hypernyms():
             sisters = [sister.lemmas()[0].name().replace('_', '') for sister in hypernym.hyponyms() if sister != synset][:MAX_SISTERS]
             raw_words.extend(sisters)
             for w in sisters:
                 related_words.append({'word': w, 'reason': f"is related to {word} via common parent", 'relation_type': 'sister'})
     
-    # Add unique raw words to train of thought
     raw_words = list(set(raw_words))
     if raw_words:
         train_of_thought.append(raw_words)
@@ -269,10 +261,8 @@ def get_related_words(word, train_of_thought=[]):
 
 def score_word(word, original_word, relation_type, similarity):
     score = 0
-    # Similarity score
     score += similarity * SIMILARITY_WEIGHT
     
-    # Relation type score
     if relation_type == 'hyponym':
         score += HYPONYM_WEIGHT
     elif relation_type == 'hypernym':
@@ -280,43 +270,41 @@ def score_word(word, original_word, relation_type, similarity):
     elif relation_type == 'sister':
         score += SISTER_WEIGHT
     
-    # Frequency score
     if word.lower() in COMMON_WORDS:
         score += FREQUENCY_WEIGHT
     
-    # Concreteness score
     if is_concrete_noun(word):
         score += CONCRETE_WEIGHT
     
     return score
 
 def get_best_related_word(word, train_of_thought):
-    # 1. Get all raw words and related words
+    # 1 get all raw words and related words
     related_objects = get_related_words(word)
     all_words = list(set(w['word'].replace('_', '') for w in related_objects))
     train_of_thought.append(sorted(all_words))
     
-    # 2. Filter nouns and adjectives
+    # 2 filter nouns and adjectives
     related_words = [w for w in all_words if is_noun_or_adjective(w)]
     if related_words and set(related_words) != set(train_of_thought[-1]):
         train_of_thought.append(sorted(related_words))
     
-    # 3. Filter valid words (no RTS, alphanumeric)
+    # 3 filter valid words (no RTS, alphanumeric)
     valid_words = [w for w in related_words if is_valid_word(w)[0]]
     if valid_words and set(valid_words) != set(train_of_thought[-1]):
         train_of_thought.append(sorted(valid_words))
     
-    # 4. Filter unused words
+    # 4 filter unused words
     unused_words = [w for w in valid_words if w.lower() not in game_state.word_history]
     if unused_words and set(unused_words) != set(train_of_thought[-1]):
         train_of_thought.append(sorted(unused_words))
     
-    # 5. Filter variations
+    # 5 filter variations
     non_variations = [w for w in unused_words if not is_word_contained(word, w)]
     if non_variations and set(non_variations) != set(train_of_thought[-1]):
         train_of_thought.append(sorted(non_variations))
     
-    # 6. Filter by similarity threshold and score words
+    # 6 filter by similarity threshold and score words
     scored_words = []
     for w in non_variations:
         synsets1 = wordnet.synsets(word, pos=[wordnet.NOUN, wordnet.ADJ])
@@ -339,13 +327,13 @@ def get_best_related_word(word, train_of_thought):
     if not scored_words:
         return None
         
-    # Sort by score and get words
+    # sort by score and get words
     scored_words.sort(key=lambda x: x['score'], reverse=True)
     similar_words = [w['word'] for w in scored_words]
     if similar_words and set(similar_words) != set(train_of_thought[-1]):
         train_of_thought.append(sorted(similar_words))
     
-    # Final selected word
+    # final selected word
     selected_word = [scored_words[0]['word']]
     train_of_thought.append(selected_word)
     
@@ -354,7 +342,7 @@ def get_best_related_word(word, train_of_thought):
 def get_word_definition(word):
     synsets = wordnet.synsets(word, pos=[wordnet.NOUN, wordnet.ADJ])
     if not synsets:
-        return "I don't know what that means"
+        return "i don't know what that means"
     
     scored_defs = []
     for synset in synsets:
@@ -403,7 +391,8 @@ def format_response(message):
         
         message = message.strip().lower()
         
-        # Special commands
+        # special commands
+
         # if message == "how":
         #     if game_state.last_word:
         #         contextual_def = get_contextual_definition(message, game_state.last_word, game_state.last_reason)
@@ -420,7 +409,7 @@ def format_response(message):
             game_state.reset()
             return format_response_with_code('RESET')
         
-        # Word Pre-validation
+        # word pre validation
         if not game_state.add_word(message):
             return format_response_with_code('DUPLICATE', word=message)
         
@@ -431,7 +420,8 @@ def format_response(message):
                 return format_response_with_code('RTS')
             return format_response_with_code('INVALID_WORD')
         
-        train_of_thought = []  # Initialize train_of_thought list
+        # initialize train_of_thought list
+        train_of_thought = []
         
         if game_state.last_word:
             if message == game_state.last_word:
@@ -451,7 +441,7 @@ def format_response(message):
                     return {
                         'response': f"{best_related['word']}", 
                         'train_of_thought': train_of_thought,
-                        'response_code': 'UNRELATED'  # Add this explicitly
+                        'response_code': 'UNRELATED'
                     }
                 return {
                     'response': f"i don't know what relates to {message}. new word pls?",
@@ -476,21 +466,21 @@ def format_response(message):
             'train_of_thought': train_of_thought
         }
     except Exception as e:
-        print(f"Error in format_response: {str(e)}")  # Log the error
+        print(f"Error in format_response: {str(e)}")
         return {
             'response': "?",
             'train_of_thought': []
         }
 
+# check if two words are related and return similarity score.
 def are_words_related(word1, word2):
-    """Check if two words are related and return similarity score."""
     synsets1 = wordnet.synsets(word1, pos=[wordnet.NOUN, wordnet.ADJ])
     synsets2 = wordnet.synsets(word2, pos=[wordnet.NOUN, wordnet.ADJ])
     
     if not synsets1 or not synsets2:
         return False, 0
     
-    # Calculate maximum similarity between any pair of synsets
+    # calculate maximum similarity between any pair of synsets
     max_similarity = max(
         (s1.path_similarity(s2) or 0)
         for s1 in synsets1

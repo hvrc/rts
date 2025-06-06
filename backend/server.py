@@ -1,14 +1,22 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from main import format_response, game_state
+import os
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})  # Allow all origins
+
+CORS(app, resources={
+    r"/*": {
+        "origins": ["https://rts0-462101.ue.r.appspot.com", "http://localhost:5173"],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type"]
+    }
+})
 
 @app.route('/')
 def home():
     game_state.reset()
-    return "Hello, World!"
+    return "welcome to the rts brain!"
 
 @app.route('/echo', methods=['POST'])
 def echo():
@@ -19,7 +27,7 @@ def echo():
         return jsonify({
             'response': response['response'],
             'train_of_thought': response.get('train_of_thought', []),
-            'response_code': response.get('response_code', '')  # Add response code
+            'response_code': response.get('response_code', '')
         }), 200
     except Exception as e:
         return jsonify({

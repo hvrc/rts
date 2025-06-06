@@ -27,10 +27,14 @@ interface ServerResponse {
 }
 
 function Chat() {
+  const API_URL = import.meta.env.PROD 
+    ? 'https://backend-dot-rts0-462101.ue.r.appspot.com'
+    : 'http://localhost:5000';
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
-  const [currentTrainOfThought, setCurrentTrainOfThought] = useState<string[]>([]);
-  const [wordPositions, setWordPositions] = useState<Array<{x: number, y: number, rotate: number, scale: number}>>([]);
+  const [currentTrainOfThought] = useState<string[]>([]);
+  const [, setWordPositions] = useState<Array<{x: number, y: number, rotate: number, scale: number}>>([]);
   const [animatingWords, setAnimatingWords] = useState<WordState[]>([]);
   const [isAnimating, setIsAnimating] = useState(false);
   const [serverData, setServerData] = useState<ServerResponse | null>(null);
@@ -63,7 +67,7 @@ function Chat() {
     setInputText('');
     
     try {
-      const response = await fetch('http://localhost:5000/echo', {
+      const response = await fetch(`${API_URL}/echo`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -120,7 +124,7 @@ function Chat() {
     const initializeChat = async () => {
       if (!mounted) return;
 
-      await fetch('http://localhost:5000/reset', {
+      await fetch(`${API_URL}/reset`, {
         method: 'POST',
       });
 
@@ -283,7 +287,7 @@ function Chat() {
   };
 
   const HeaderComponent = () => {
-    const [isDarkMode, setIsDarkMode] = useState(false);
+    const [isDarkMode] = useState(false);
 
     const buttonContainerStyle = {
       display: 'flex',
@@ -324,7 +328,6 @@ function Chat() {
       transition: 'background-color 0.3s ease'
     } as React.CSSProperties;
 
-    // Update button colors based on state
     useEffect(() => {
       if (trainOfThoughtButtonRef.current) {
         trainOfThoughtButtonRef.current.style.backgroundColor = showThoughtProcess ? '#CCCCFF' : '#E9E9EB';
@@ -344,7 +347,7 @@ function Chat() {
       }}>
         <Logo />
         <div style={buttonContainerStyle}>
-          {/* Train of Thought button (left) */}
+          {/* Train of Thought button */}
           <div style={{ position: 'relative' }}>
             <div
               ref={trainOfThoughtButtonRef}
@@ -572,7 +575,7 @@ function Chat() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              marginTop: '2px'  // Added this line to nudge button down
+              marginTop: '2px'
             }}
           >
           </button>

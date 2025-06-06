@@ -1,5 +1,3 @@
-import React from 'react';
-
 const Logo = () => {
   const bubbleStyle = {
     width: '30px',
@@ -22,7 +20,7 @@ const Logo = () => {
     display: 'flex',
     justifyContent: 'center',
     width: '100%',
-    padding: '8px 0 16px 0' // Add padding top and bottom
+    padding: '8px 0 16px 0'
   };
 
   return (
