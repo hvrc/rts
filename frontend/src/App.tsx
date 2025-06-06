@@ -1,4 +1,4 @@
-import ChatBox from './components/ChatBox'
+import Chat from './components/chat'
 
 function App() {
   return (
@@ -11,7 +11,7 @@ function App() {
       backgroundColor: '#fff',
       padding: window.innerWidth <= 400 ? '10px' : '0'
     }}>
-      <ChatBox />
+      <Chat />
     </div>
   )
 }

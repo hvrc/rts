@@ -1,6 +1,7 @@
 import React from 'react';
 import { useState, useRef, useEffect } from 'react';
-import './ChatBox.css';
+import './chat.css';
+import Logo from './Logo';
 
 interface Message {
   text: string;
@@ -25,7 +26,7 @@ interface ServerResponse {
   response_code: string;  // Add this
 }
 
-function ChatBox() {
+function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [currentTrainOfThought, setCurrentTrainOfThought] = useState<string[]>([]);
@@ -113,13 +114,59 @@ function ChatBox() {
     }
   };
 
-  React.useEffect(() => {
-    fetch('http://localhost:5000/reset', {
-      method: 'POST',
-    })
-    .then(response => response.json())
-    .catch(error => console.error('Error resetting game:', error));
-  }, []);
+  // Update the initialization effect
+  useEffect(() => {
+    let mounted = true;
+    
+    const initializeChat = async () => {
+      if (!mounted) return;
+
+      // First reset the game state
+      await fetch('http://localhost:5000/reset', {
+        method: 'POST',
+      });
+
+      const welcomeMessages = [
+        'rts: we say words back n forth',
+        'they have to be kinda related',
+        "and can't start with r t or s",
+        'u start...',
+      ];
+      
+      for (const message of welcomeMessages) {
+        if (!mounted) break;
+        
+        // Add empty message first
+        setMessages(prev => [...prev, { text: "", isUser: false }]);
+        
+        // Animate the text character by character
+        setIsTextAnimating(true);
+        setAnimatedText("");
+        for (let i = 0; i < message.length; i++) {
+          if (!mounted) break;
+          setAnimatedText(prev => prev + message[i]);
+          await new Promise(resolve => setTimeout(resolve, 25));
+        }
+        
+        // Update the final message text
+        setMessages(prev => {
+          const newMessages = [...prev];
+          newMessages[newMessages.length - 1].text = message;
+          return newMessages;
+        });
+        setIsTextAnimating(false);
+        
+        // Add delay between messages
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    };
+
+    initializeChat();
+    
+    return () => {
+      mounted = false;
+    };
+  }, []); // Empty dependency array means this runs once when component mounts
 
   useEffect(() => {
     if (currentTrainOfThought.length > 0) {
@@ -248,6 +295,7 @@ function ChatBox() {
       position: 'absolute',
       width: '280px',
     }}>
+      <Logo />
       <div 
         ref={chatBoxRef}
         style={{ 
@@ -389,4 +437,4 @@ function ChatBox() {
   );
 }
 
-export default ChatBox;
+export default Chat;
