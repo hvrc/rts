@@ -1,36 +1,13 @@
 .messages-container {
   flex: 1;
-  overflow-y: auto;
+  overflow-y: scroll;
   padding: 10px;
   -ms-overflow-style: none;
-  scrollbar-width: none;
+  scrollbar-width: none;  /* Firefox */
 }
 
 .messages-container::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
-}
-
-.messages-container::-webkit-scrollbar-button {
-  display: none;
-}
-
-.messages-container::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.messages-container::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 4px;
-}
-
-.messages-container::-webkit-scrollbar-thumb:hover {
-  background: #555;
-}
-
-.messages-container {
-  scrollbar-width: thin;
-  scrollbar-color: #888 transparent;
+  display: none;  /* Chrome, Safari, and Opera */
 }
 
 .train-of-thought {

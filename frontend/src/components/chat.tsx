@@ -6,7 +6,7 @@ import Logo from './Logo';
 interface Message {
   text: string;
   isUser: boolean;
-  showQuestionMark?: boolean;  // Add this
+  showQuestionMark?: boolean;
 }
 
 interface WordState {
@@ -23,7 +23,7 @@ interface WordState {
 interface ServerResponse {
   response: string;
   train_of_thought: string[][];
-  response_code: string;  // Add this
+  response_code: string;
 }
 
 function Chat() {
@@ -34,13 +34,17 @@ function Chat() {
   const [animatingWords, setAnimatingWords] = useState<WordState[]>([]);
   const [isAnimating, setIsAnimating] = useState(false);
   const [serverData, setServerData] = useState<ServerResponse | null>(null);
-  const [isTyping, setIsTyping] = useState(false); // New state for tracking typing indicator
+  const [isTyping, setIsTyping] = useState(false);
   const [animatedText, setAnimatedText] = useState("");
   const [isTextAnimating, setIsTextAnimating] = useState(false);
+  const [showThoughtProcess, setShowThoughtProcess] = useState(false);
+  const [lastProcessedMessage, setLastProcessedMessage] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const latestBotMessageRef = useRef<HTMLDivElement>(null);
   const chatBoxRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const trainOfThoughtButtonRef = useRef<HTMLDivElement>(null);
+  const darkModeButtonRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -50,12 +54,10 @@ function Chat() {
     scrollToBottom();
   }, [messages]);
 
-  // Update the handleSubmit function
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
 
-    // Add user message first without question mark
     setMessages(prev => [...prev, { text: inputText, isUser: true }]);
     const userInput = inputText;
     setInputText('');
@@ -73,11 +75,9 @@ function Chat() {
 
       const data: ServerResponse = await response.json();
 
-      // If response is UNRELATED, update the last user message to show question mark
       if (data.response_code === 'UNRELATED') {
         setMessages(prev => {
           const newMessages = [...prev];
-          // Find the last user message and add question mark
           for (let i = newMessages.length - 1; i >= 0; i--) {
             if (newMessages[i].isUser) {
               newMessages[i].showQuestionMark = true;
@@ -87,14 +87,13 @@ function Chat() {
           return [...newMessages, { text: data.response, isUser: false }];
         });
       } else {
-        // Normal bot response without question mark
         setMessages(prev => [...prev, { text: data.response, isUser: false }]);
       }
 
-      // Rest of the handling remains the same
-      if (data.train_of_thought && data.train_of_thought.length > 0) {
+      if (showThoughtProcess && data.train_of_thought && data.train_of_thought.length > 0 && userInput !== lastProcessedMessage) {
         setServerData(data);
         setIsTyping(true);
+        setLastProcessedMessage(userInput);
       } else {
         setIsTextAnimating(true);
         setAnimatedText("");
@@ -103,25 +102,24 @@ function Chat() {
           await new Promise(resolve => setTimeout(resolve, 50));
         }
         setIsTextAnimating(false);
+        setLastProcessedMessage(userInput);
       }
 
     } catch (error) {
       console.error('Error:', error);
       setMessages(prev => [...prev, { 
-        text: "Sorry, I encountered an error. Please try again.", 
+        text: "?", 
         isUser: false 
       }]);
     }
   };
 
-  // Update the initialization effect
   useEffect(() => {
     let mounted = true;
     
     const initializeChat = async () => {
       if (!mounted) return;
 
-      // First reset the game state
       await fetch('http://localhost:5000/reset', {
         method: 'POST',
       });
@@ -129,17 +127,15 @@ function Chat() {
       const welcomeMessages = [
         'rts: we say words back n forth',
         'they have to be kinda related',
-        "and can't start with r t or s",
+        "they can't start with r t or s",
         'u start...',
       ];
       
       for (const message of welcomeMessages) {
         if (!mounted) break;
         
-        // Add empty message first
         setMessages(prev => [...prev, { text: "", isUser: false }]);
         
-        // Animate the text character by character
         setIsTextAnimating(true);
         setAnimatedText("");
         for (let i = 0; i < message.length; i++) {
@@ -148,7 +144,6 @@ function Chat() {
           await new Promise(resolve => setTimeout(resolve, 25));
         }
         
-        // Update the final message text
         setMessages(prev => {
           const newMessages = [...prev];
           newMessages[newMessages.length - 1].text = message;
@@ -156,7 +151,6 @@ function Chat() {
         });
         setIsTextAnimating(false);
         
-        // Add delay between messages
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     };
@@ -166,13 +160,13 @@ function Chat() {
     return () => {
       mounted = false;
     };
-  }, []); // Empty dependency array means this runs once when component mounts
+  }, []);
 
   useEffect(() => {
     if (currentTrainOfThought.length > 0) {
       const newPositions = currentTrainOfThought.map(() => ({
-        x: Math.random() * 260 - 35, // Span messages-container width (280px - 10px padding on each side)
-        y: Math.random() * 430, // Span messages-container height (approx 430px)
+        x: Math.random() * 260 - 35,
+        y: Math.random() * 430,
         rotate: Math.random() * 30 - 15,
         scale: 0.8 + Math.random() * 0.4
       }));
@@ -180,13 +174,17 @@ function Chat() {
     }
   }, [currentTrainOfThought]);
 
-  // Update the animation effect
   useEffect(() => {
-    if (!serverData?.train_of_thought || !Array.isArray(serverData.train_of_thought)) return;
+    if (!showThoughtProcess || !serverData?.train_of_thought || !Array.isArray(serverData.train_of_thought)) {
+      setIsAnimating(false);
+      setIsTyping(false);
+      setAnimatingWords([]);
+      return;
+    }
     
     const animate = async () => {
       setIsAnimating(true);
-      setIsTyping(true); // Start typing indicator
+      setIsTyping(true);
       
       for (let i = 0; i < serverData.train_of_thought.length - 1; i++) {
         const currentList = serverData.train_of_thought[i];
@@ -195,8 +193,8 @@ function Chat() {
         if (i === 0) {
           const positions = new Map(
             currentList.map(word => [word, {
-              x: Math.random() * 260 - 35, // Span messages-container width
-              y: Math.random() * 430, // Span messages-container height
+              x: Math.random() * 260 - 35,
+              y: Math.random() * 430,
               rotate: Math.random() * 30 - 15,
               scale: 0.9 + Math.random() * 0.2
             }])
@@ -238,21 +236,17 @@ function Chat() {
           }
         }
 
-        // Update the last iteration check in the animation effect
         if (i === serverData.train_of_thought.length - 2) {
-          // Show the bot response first
           await new Promise(resolve => setTimeout(resolve, 500));
-          setIsTyping(false); // Stop typing indicator
+          setIsTyping(false);
           
-          // Animate the bot's response character by character
           await animateText(messages[messages.length - 1].text);
           
-          // Wait a moment after text animation, then fade out last word
           await new Promise(resolve => setTimeout(resolve, 300));
           setAnimatingWords(prev => 
             prev.map(w => ({
               ...w,
-              opacity: 0 // Fade out all remaining words
+              opacity: 0
             }))
           );
         }
@@ -266,9 +260,8 @@ function Chat() {
       setIsAnimating(false);
       setIsTyping(false);
     };
-  }, [serverData?.train_of_thought]);
+  }, [serverData?.train_of_thought, showThoughtProcess]);
 
-  // Update the animateText function
   const animateText = async (text: string) => {
     if (!text) return;
     
@@ -280,7 +273,6 @@ function Chat() {
       await new Promise(resolve => setTimeout(resolve, 25));
     }
     
-    // Update the actual message text after animation
     setMessages(prev => {
       const newMessages = [...prev];
       newMessages[newMessages.length - 1].text = text;
@@ -291,12 +283,14 @@ function Chat() {
   };
 
   const HeaderComponent = () => {
+    const [isDarkMode, setIsDarkMode] = useState(false);
+
     const buttonContainerStyle = {
       display: 'flex',
       gap: '8px',
       alignItems: 'center',
-      marginRight: '27px',
-      marginTop: '6px'
+      marginRight: '45px',
+      marginTop: '10px'
     };
 
     const buttonStyle = {
@@ -315,7 +309,7 @@ function Chat() {
       alignItems: 'center',
       justifyContent: 'center',
       fontSize: '14px',
-      transition: 'background-color 0.2s ease',
+      transition: 'background-color 0.3s ease',
       position: 'relative'
     } as React.CSSProperties;
 
@@ -327,8 +321,18 @@ function Chat() {
       bottom: 0,
       borderRadius: '50%',
       cursor: 'pointer',
-      transition: 'background-color 0.2s ease'
+      transition: 'background-color 0.3s ease'
     } as React.CSSProperties;
+
+    // Update button colors based on state
+    useEffect(() => {
+      if (trainOfThoughtButtonRef.current) {
+        trainOfThoughtButtonRef.current.style.backgroundColor = showThoughtProcess ? '#CCCCFF' : '#E9E9EB';
+      }
+      if (darkModeButtonRef.current) {
+        darkModeButtonRef.current.style.backgroundColor = isDarkMode ? '#CCCCFF' : '#E9E9EB';
+      }
+    }, [showThoughtProcess, isDarkMode]);
 
     return (
       <div style={{
@@ -340,13 +344,18 @@ function Chat() {
       }}>
         <Logo />
         <div style={buttonContainerStyle}>
-
-          {/* Show thought process button */}
+          {/* Train of Thought button (left) */}
           <div style={{ position: 'relative' }}>
-            <div style={buttonStyle}>
+            <div
+              ref={trainOfThoughtButtonRef}
+              style={{
+                ...buttonStyle,
+                backgroundColor: showThoughtProcess ? '#CCCCFF' : '#E9E9EB'
+              }}
+            >
               <input
                 type="checkbox"
-                id="thoughtProcessToggle"
+                id="trainOfThoughtToggle"
                 style={{
                   opacity: 0,
                   position: 'absolute',
@@ -355,36 +364,39 @@ function Chat() {
                   margin: 0,
                   cursor: 'pointer'
                 }}
+                checked={showThoughtProcess}
                 onChange={(e) => {
-                  const container = e.currentTarget.parentElement;
-                  if (container) {
-                    container.style.backgroundColor = e.currentTarget.checked ? '#89CFF0' : '#E9E9EB';
-                  }
+                  setShowThoughtProcess(e.currentTarget.checked);
                 }}
                 onMouseOver={(e) => {
                   const container = e.currentTarget.parentElement;
-                  if (container && !e.currentTarget.checked) {
+                  if (container && !showThoughtProcess) {
                     container.style.backgroundColor = '#D3D3D3';
                   }
                 }}
                 onMouseOut={(e) => {
                   const container = e.currentTarget.parentElement;
-                  if (container && !e.currentTarget.checked) {
+                  if (container && !showThoughtProcess) {
                     container.style.backgroundColor = '#E9E9EB';
                   }
                 }}
               />
-              <label htmlFor="thoughtProcessToggle" style={labelStyle} title="Show thought process"></label>
+              <label htmlFor="trainOfThoughtToggle" style={labelStyle} title="Train of Thought"></label>
             </div>
           </div>
 
-          
-          {/* Train of thought button */}
-          <div style={{ position: 'relative' }}>
-            <div style={buttonStyle}>
+          {/* Dark Mode button (right) */}
+          {/* <div style={{ position: 'relative' }}>
+            <div
+              ref={darkModeButtonRef}
+              style={{
+                ...buttonStyle,
+                backgroundColor: isDarkMode ? '#CCCCFF' : '#E9E9EB'
+              }}
+            >
               <input
                 type="checkbox"
-                id="trainToggle"
+                id="darkModeToggle"
                 style={{
                   opacity: 0,
                   position: 'absolute',
@@ -393,29 +405,26 @@ function Chat() {
                   margin: 0,
                   cursor: 'pointer'
                 }}
+                checked={isDarkMode}
                 onChange={(e) => {
-                  const container = e.currentTarget.parentElement;
-                  if (container) {
-                    container.style.backgroundColor = e.currentTarget.checked ? '#CCCCFF' : '#E9E9EB';
-                  }
+                  setIsDarkMode(e.currentTarget.checked);
                 }}
                 onMouseOver={(e) => {
                   const container = e.currentTarget.parentElement;
-                  if (container && !e.currentTarget.checked) {
+                  if (container && !isDarkMode) {
                     container.style.backgroundColor = '#D3D3D3';
                   }
                 }}
                 onMouseOut={(e) => {
                   const container = e.currentTarget.parentElement;
-                  if (container && !e.currentTarget.checked) {
+                  if (container && !isDarkMode) {
                     container.style.backgroundColor = '#E9E9EB';
                   }
                 }}
               />
-              <label htmlFor="trainToggle" style={labelStyle} title="Train of thought"></label>
+              <label htmlFor="darkModeToggle" style={labelStyle} title="Dark Mode"></label>
             </div>
-          </div>
-
+          </div> */}
         </div>
       </div>
     );
@@ -441,16 +450,16 @@ function Chat() {
           ref={messagesContainerRef} 
           className="messages-container"
         >
-          {isAnimating && (
+          {isAnimating && showThoughtProcess && (
             <div className="train-of-thought" style={{
               position: 'absolute',
               top: 0,
               left: 0,
-              width: '100%', // Match messages-container width
-              height: '100%', // Match messages-container height
+              width: '100%',
+              height: '100%',
               pointerEvents: 'none',
-              zIndex: 10, // Render in front of messages
-              padding: '10px' // Match messages-container padding
+              zIndex: 10,
+              padding: '10px'
             }}>
               {animatingWords.map((wordState, index) => (
                 <div
@@ -468,9 +477,9 @@ function Chat() {
                     }px) rotate(${wordState.position.rotate}deg) scale(${wordState.position.scale})`,
                     opacity: wordState.opacity,
                     transition: `opacity ${
-                      wordState.opacity === 0 ? '2s' :  // longer fade out
-                      wordState.opacity === 1 ? '1s' :  // normal fade in
-                      '0.1s'                           // default
+                      wordState.opacity === 0 ? '2s' : 
+                      wordState.opacity === 1 ? '1s' : 
+                      '0.1s'
                     } ${
                       wordState.opacity === 0 ? 'ease-out' : 'ease-in'
                     }`
@@ -492,7 +501,7 @@ function Chat() {
               }}
             >
               <div style={{ position: 'relative' }}>
-                {message.isUser && message.showQuestionMark && ( // Changed from message.isUser to !message.isUser
+                {message.isUser && message.showQuestionMark && (
                   <div className="question-mark-circle">
                     ?
                   </div>
@@ -505,7 +514,7 @@ function Chat() {
                   color: message.isUser ? 'white' : 'black'
                 }}>
                   {(!message.isUser && index === messages.length - 1) ? (
-                    isTyping ? (
+                    isTyping && showThoughtProcess ? (
                       <div className="typing-indicator">
                         <span></span>
                         <span></span>
@@ -539,7 +548,7 @@ function Chat() {
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            placeholder="Message"
+            placeholder=""
             style={{
               flex: 1,
               padding: '8px 12px',
@@ -551,16 +560,20 @@ function Chat() {
           <button
             type="submit"
             style={{
-              padding: '8px 16px',
-              borderRadius: '20px',
+              width: '25px',             // Added fixed width
+              height: '25px',            // Added fixed height
+              padding: 0,                // Reset padding
+              borderRadius: '50%',       // Changed to 50% for perfect circle
               backgroundColor: '#FFAC1C',
               color: 'white',
               border: 'none',
               outline: 'none',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              display: 'flex',           // Added flex display
+              alignItems: 'center',      // Center content vertically
+              justifyContent: 'center'   // Center content horizontally
             }}
           >
-            ^
           </button>
         </form>
       </div>
