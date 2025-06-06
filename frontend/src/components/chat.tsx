@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState, useRef, useEffect } from 'react';
-import './chat.css';
+import './Chat.css';
 import Logo from './Logo';
 
 interface Message {
@@ -125,7 +125,7 @@ function Chat() {
       });
 
       const welcomeMessages = [
-        'rts: we say words back n forth',
+        'we say words back n forth',
         'they have to be kinda related',
         "they can't start with r t or s",
         'u start...',
@@ -560,18 +560,19 @@ function Chat() {
           <button
             type="submit"
             style={{
-              width: '25px',             // Added fixed width
-              height: '25px',            // Added fixed height
-              padding: 0,                // Reset padding
-              borderRadius: '50%',       // Changed to 50% for perfect circle
+              width: '25px',
+              height: '25px',
+              padding: 0,
+              borderRadius: '50%',
               backgroundColor: '#FFAC1C',
               color: 'white',
               border: 'none',
               outline: 'none',
               cursor: 'pointer',
-              display: 'flex',           // Added flex display
-              alignItems: 'center',      // Center content vertically
-              justifyContent: 'center'   // Center content horizontally
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginTop: '2px'  // Added this line to nudge button down
             }}
           >
           </button>

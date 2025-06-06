@@ -108,16 +108,16 @@ RESPONSE_CONFIG = {
         'message': "new word pls?",
         'has_train': False
     },
-    'HOW_WHAT': {
-        'code': 'HOW_WHAT',
-        'message': "how what?",
-        'has_train': False
-    },
-    'DEFINE_WHAT': {
-        'code': 'DEFINE_WHAT',
-        'message': "define what?",
-        'has_train': False
-    },
+    # 'HOW_WHAT': {
+    #     'code': 'HOW_WHAT',
+    #     'message': "how what?",
+    #     'has_train': False
+    # },
+    # 'DEFINE_WHAT': {
+    #     'code': 'DEFINE_WHAT',
+    #     'message': "define what?",
+    #     'has_train': False
+    # },
     'RESET': {
         'code': 'RESET',
         'message': "alright, give me a word",
@@ -125,7 +125,7 @@ RESPONSE_CONFIG = {
     },
     'ERROR': {
         'code': 'ERROR',
-        'message': "Sorry, I had trouble processing that word. Try another?",
+        'message': "?",
         'has_train': False
     }
 }
@@ -404,17 +404,17 @@ def format_response(message):
         message = message.strip().lower()
         
         # Special commands
-        if message == "how":
-            if game_state.last_word:
-                contextual_def = get_contextual_definition(message, game_state.last_word, game_state.last_reason)
-                return format_response_with_code('CONTEXTUAL_DEF', definition=contextual_def)
-            return format_response_with_code('HOW_WHAT')
+        # if message == "how":
+        #     if game_state.last_word:
+        #         contextual_def = get_contextual_definition(message, game_state.last_word, game_state.last_reason)
+        #         return format_response_with_code('CONTEXTUAL_DEF', definition=contextual_def)
+        #     return format_response_with_code('HOW_WHAT')
         
-        if message == "define":
-            if game_state.last_word:
-                definitions = get_word_definition(game_state.last_word)
-                return format_response_with_code('DEFINITION', definition=definitions)
-            return format_response_with_code('DEFINE_WHAT')
+        # if message == "define":
+        #     if game_state.last_word:
+        #         definitions = get_word_definition(game_state.last_word)
+        #         return format_response_with_code('DEFINITION', definition=definitions)
+        #     return format_response_with_code('DEFINE_WHAT')
         
         if message == "reset":
             game_state.reset()
@@ -478,7 +478,7 @@ def format_response(message):
     except Exception as e:
         print(f"Error in format_response: {str(e)}")  # Log the error
         return {
-            'response': "Sorry, I had trouble processing that word. Try another?",
+            'response': "?",
             'train_of_thought': []
         }
 
