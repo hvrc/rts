@@ -435,23 +435,35 @@ function Chat() {
 
   return (
     <div style={{ 
-      position: 'absolute',
+      position: 'fixed',
       width: '280px',
+      height: '100%',
+      maxHeight: '480px',
+      display: 'flex',
+      flexDirection: 'column',
     }}>
       <HeaderComponent />
       <div 
         ref={chatBoxRef}
         style={{ 
-          width: '280px',
-          height: '480px',
+          flex: 1,
+          width: '100%',
           display: 'flex',
           flexDirection: 'column',
-          position: 'relative'
+          position: 'relative',
+          overflow: 'hidden'
         }}
       >
         <div 
           ref={messagesContainerRef} 
           className="messages-container"
+          style={{
+            flex: 1,
+            overflowY: 'scroll',
+            WebkitOverflowScrolling: 'touch',
+            msOverflowStyle: 'none',
+            scrollbarWidth: 'none'
+          }}
         >
           {isAnimating && showThoughtProcess && (
             <div className="train-of-thought" style={{
@@ -544,7 +556,8 @@ function Chat() {
             gap: '8px',
             padding: '10px',
             position: 'relative',
-            zIndex: 3
+            zIndex: 3,
+            backgroundColor: '#fff'
           }}
         >
           <input
@@ -557,7 +570,11 @@ function Chat() {
               padding: '8px 12px',
               borderRadius: '20px',
               border: '1px solid #E9E9EB',
-              outline: 'none'
+              outline: 'none',
+              fontSize: window.innerWidth <= 768 ? '16px' : '14px',
+              WebkitAppearance: 'none',
+              touchAction: 'manipulation',
+              userSelect: 'text'
             }}
           />
           <button

@@ -20,6 +20,8 @@ build/
 .env.production.local
 
 info.txt
+structure.txt
+# todo.txt
 
 *.log
 npm-debug.log*

@@ -9,7 +9,11 @@ function App() {
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: '#fff',
-      padding: window.innerWidth <= 400 ? '10px' : '0'
+      padding: window.innerWidth <= 400 ? '10px' : '0',
+      overflow: 'hidden',
+      position: 'fixed',
+      top: 0,
+      left: 0
     }}>
       <Chat />
     </div>
