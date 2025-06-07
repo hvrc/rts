@@ -107,18 +107,12 @@ def format_response(message, game_state):
                         'train_of_thought': train_of_thought,
                         'response_code': 'UNRELATED'
                     }
-                return {
-                    'response': f"i don't know what relates to {message}. new word pls?",
-                    'train_of_thought': []
-                }
+                return format_response_with_code('NO_RELATION')
         
         best_related = get_best_related_word(message, train_of_thought, game_state)
         if not best_related:
             game_state.word_history.remove(message)
-            return {
-                'response': f"i don't know what relates to {message}. can you give me another word?",
-                'train_of_thought': []
-            }
+            return format_response_with_code('NO_RELATION')
         
         game_state.add_word(best_related['word'])
         game_state.last_word = best_related['word']
