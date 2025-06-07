@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from main import format_response, game_state
+from game_state import GameState
+from response_handler import format_response
 import os
 
 app = Flask(__name__)
@@ -13,6 +14,8 @@ CORS(app, resources={
     }
 })
 
+game_state = GameState()
+
 @app.route('/')
 def home():
     game_state.reset()
@@ -23,7 +26,7 @@ def echo():
     try:
         data = request.json
         message = data.get('message', '')
-        response = format_response(message)
+        response = format_response(message, game_state)
         return jsonify({
             'response': response['response'],
             'train_of_thought': response.get('train_of_thought', []),
@@ -39,10 +42,11 @@ def echo():
 
 @app.route('/reset', methods=['POST'])
 def reset():
-    response = format_response('reset')
+    response = format_response('reset', game_state)
     return jsonify({
         'response': response['response'],
-        'train_of_thought': []
+        'train_of_thought': response.get('train_of_thought', []),
+        'response_code': response.get('response_code', '')
     })
 
 if __name__ == '__main__':
