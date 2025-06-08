@@ -94,7 +94,7 @@ def format_response(message, game_state):
                 return format_response_with_code('TOO_SIMILAR', word=message, last_word=game_state.last_word)
             
             is_related, similarity = are_words_related(message, game_state.last_word)
-            if similarity < 0.2:
+            if similarity < game_state.player_similarity_threshold:
                 previous_word = game_state.last_word
                 best_related = get_best_related_word(message, train_of_thought, game_state)
                 if best_related:
@@ -121,11 +121,9 @@ def format_response(message, game_state):
         
         return {
             'response': best_related['word'],
-            'train_of_thought': train_of_thought
+            'train_of_thought': train_of_thought,
+            'response_code': 'RELATED'
         }
     except Exception as e:
         print(f"Error in format_response: {str(e)}")
-        return {
-            'response': "?",
-            'train_of_thought': []
-        }
+        return format_response_with_code('ERROR')

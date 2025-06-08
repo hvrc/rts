@@ -1,80 +1,13 @@
 from nltk.corpus import wordnet
 import nltk
+from constants import COMMON_WORDS
+from combined_scorer import CombinedScorer
+from wordnet_scorer import is_concrete_noun
 
 nltk.download('wordnet')
 nltk.download('averaged_perceptron_tagger')
 
-# Word scoring weights
-SIMILARITY_WEIGHT = 0.4
-HYPONYM_WEIGHT = 0.2
-HYPERNYM_WEIGHT = 0.2
-SISTER_WEIGHT = 0.15
-FREQUENCY_WEIGHT = 0.15
-CONCRETE_WEIGHT = 0.1
-
-# WordNet concrete roots
-CONCRETE_ROOTS = {
-    'physical_entity.n.01', 'matter.n.03', 'artifact.n.01', 'natural_object.n.01',
-    'organism.n.01', 'plant.n.02', 'animal.n.01', 'substance.n.01', 'food.n.01',
-    'object.n.01', 'structure.n.01', 'body_part.n.01'
-}
-
-# Keywords for definition scoring
-ABSTRACT_KEYWORDS = {
-    'abstract', 'quality', 'state', 'condition', 'feeling', 'emotion', 'concept',
-    'idea', 'activity', 'action', 'process', 'phenomenon', 'manner', 'way', 'belief',
-    'thought', 'system', 'method', 'principle', 'theory', 'relationship', 'attitude',
-    'perception', 'intention', 'event', 'time', 'situation', 'experience', 'notion',
-    'perspective', 'value', 'judgment', 'opinion', 'motivation', 'consciousness',
-    'awareness', 'memory', 'imagination', 'creativity', 'ethics', 'morality', 'justice',
-    'freedom', 'culture', 'language', 'knowledge', 'wisdom', 'faith', 'hope', 'love',
-    'fear', 'curiosity', 'decision', 'expectation', 'possibility', 'potential',
-    'responsibility', 'intellect', 'attention', 'strategy', 'goal', 'habit', 'intuition',
-    'insight', 'identity', 'motif', 'theme', 'ideal', 'rule', 'norm', 'law',
-    'influence', 'conceptualization', 'inspiration', 'state of mind', 'impression',
-    'symbolism'
-}
-
-CONCRETE_INDICATORS = {
-    'object', 'thing', 'item', 'entity', 'physical', 'material', 'substance',
-    'structure', 'device', 'tool', 'container', 'animal', 'plant', 'machine',
-    'building', 'vehicle', 'furniture', 'instrument', 'appliance', 'equipment',
-    'artifact', 'product', 'element', 'component', 'part', 'organism', 'creature',
-    'materiality', 'surface', 'texture', 'solid', 'liquid', 'gas', 'metal', 'wood',
-    'fabric', 'clothing', 'fruit', 'vegetable', 'mineral', 'rock', 'body', 'hand',
-    'face', 'foot', 'flower', 'leaf', 'seed', 'fruit', 'toolkit', 'utensil', 'weapon',
-    'box', 'bag', 'fossil', 'statue', 'coin', 'jewel', 'gem', 'crystal', 'fiber'
-}
-
-COMMON_WORDS = {
-    'dog', 'cat', 'house', 'book', 'food', 'water', 'bed', 'chair', 'phone', 'car',
-    'door', 'box', 'cup', 'desk', 'bird', 'fish', 'hand', 'key', 'milk', 'paper',
-    'coin', 'glass', 'mouth', 'nose', 'ball', 'eye', 'beach'
-}
-
-def is_concrete_by_hypernyms(synset):
-    try:
-        hypernym_paths = synset.hypernym_paths()
-        return any(any(h.name() in CONCRETE_ROOTS for h in path) for path in hypernym_paths)
-    except:
-        return False
-
-def is_concrete_noun(word):
-    synsets = wordnet.synsets(word, pos=wordnet.NOUN)
-    word = word.lower()
-    
-    if not synsets:
-        return False
-    
-    for synset in synsets:
-        definition = synset.definition().lower()
-        if any(keyword in definition for keyword in ABSTRACT_KEYWORDS):
-            continue
-        if any(indicator in definition for indicator in CONCRETE_INDICATORS):
-            return True
-        if is_concrete_by_hypernyms(synset):
-            return True
-    return False
+scorer = CombinedScorer()
 
 def is_noun_or_adjective(word):
     synsets = wordnet.synsets(word, pos=[wordnet.NOUN, wordnet.ADJ])
@@ -113,24 +46,11 @@ def get_related_words(word, train_of_thought=[]):
     
     return related_words[:25]
 
+def are_words_related(word1, word2):
+    return scorer.are_words_related(word1, word2)
+
 def score_word(word, original_word, relation_type, similarity):
-    score = 0
-    score += similarity * SIMILARITY_WEIGHT
-    
-    if relation_type == 'hyponym':
-        score += HYPONYM_WEIGHT
-    elif relation_type == 'hypernym':
-        score += HYPERNYM_WEIGHT
-    elif relation_type == 'sister':
-        score += SISTER_WEIGHT
-    
-    if word.lower() in COMMON_WORDS:
-        score += FREQUENCY_WEIGHT
-    
-    if is_concrete_noun(word):
-        score += CONCRETE_WEIGHT
-    
-    return score
+    return scorer.score_word(word, original_word, relation_type, similarity)
 
 def get_best_related_word(word, train_of_thought, game_state):
     # 1 get all raw words and related words
@@ -241,8 +161,8 @@ def get_contextual_definition(word1, word2, reason):
 def is_valid_word(word):
     if not word:
         return False, " "
-    if word.lower()[0] in ['r', 't', 's']:
-        return False, "rts"
+    # if word.lower()[0] in ['r', 't', 's']:
+    #     return False, "rts"
     if not word.isalpha():
         return False, f"{word} doesn't count ,(doesn't count"
     if not is_noun_or_adjective(word):
@@ -276,19 +196,3 @@ def is_word_contained(word1, word2):
                 return True
                 
     return False
-
-def are_words_related(word1, word2):
-    synsets1 = wordnet.synsets(word1, pos=[wordnet.NOUN, wordnet.ADJ])
-    synsets2 = wordnet.synsets(word2, pos=[wordnet.NOUN, wordnet.ADJ])
-    
-    if not synsets1 or not synsets2:
-        return False, 0
-    
-    # calculate maximum similarity between any pair of synsets
-    max_similarity = max(
-        (s1.path_similarity(s2) or 0)
-        for s1 in synsets1
-        for s2 in synsets2
-    )
-    
-    return max_similarity >= 0.2, max_similarity
