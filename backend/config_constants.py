@@ -1,5 +1,5 @@
 from datetime import datetime
-from config_db import constants
+from config_storage import storage_manager
 
 DEFAULT_CONSTANTS = {
     'PLAYER_THRESHOLD': 0.5,
@@ -60,13 +60,66 @@ DEFAULT_CONSTANTS = {
     'ENFORCE_RTS_RULE': True,
 }
 
+RESPONSE_CONFIG = {
+    'EMPTY': {
+        'code': 'EMPTY',
+        'message': '?',
+        'has_train': False
+    },
+    'RTS': {
+        'code': 'RTS',
+        'message': 'rts',
+        'has_train': False
+    },
+    'INVALID_WORD': {
+        'code': 'INVALID_WORD',
+        'message': "doesn't count",
+        'has_train': False
+    },
+    'DUPLICATE': {
+        'code': 'DUPLICATE',
+        'message': "we used {word} already",
+        'has_train': False
+    },
+    'SAME_WORD': {
+        'code': 'SAME_WORD',
+        'message': "we just used {word}",
+        'has_train': False
+    },
+    'TOO_SIMILAR': {
+        'code': 'TOO_SIMILAR',
+        'message': "isn't {word} too similar to {last_word}?",
+        'has_train': False
+    },
+    'UNRELATED': {
+        'code': 'UNRELATED',
+        'message': "{suggestion}",
+        'has_train': True
+    },
+    'NO_RELATION': {
+        'code': 'NO_RELATION',
+        'message': "new word pls?",
+        'has_train': False
+    },
+    'RESET': {
+        'code': 'RESET',
+        'message': "alright, give me a word",
+        'has_train': False
+    },
+    'ERROR': {
+        'code': 'ERROR',
+        'message': "?",
+        'has_train': False
+    }
+}
+
 def initialize_constants():
     """Initialize constants in local storage"""
     for name, value in DEFAULT_CONSTANTS.items():
         try:
-            stored = constants.find_one({'name': name})
+            stored = storage_manager.find_one('constants', {'name': name})
             if stored is None:
-                constants.insert_one({
+                storage_manager.insert_one('constants', {
                     'name': name,
                     'value': value,
                     'created_at': datetime.now(),
@@ -78,7 +131,7 @@ def initialize_constants():
 def get_constant(name):
     """Get constant from local storage with fallback to defaults"""
     try:
-        constant = constants.find_one({'name': name})
+        constant = storage_manager.find_one('constants', {'name': name})
         return constant['value'] if constant else DEFAULT_CONSTANTS.get(name)
     except Exception as e:
         print(f"Error getting constant {name}, using default: {str(e)}")
@@ -88,7 +141,8 @@ def update_constant(name, value):
     """Update constant in local storage"""
     try:
         now = datetime.now()
-        constants.update_one(
+        storage_manager.update_one(
+            'constants',
             {'name': name},
             {
                 '$set': {

@@ -1,58 +1,6 @@
 from game_state import GameState
 from utils_wordnet import is_valid_word, is_word_contained, get_best_related_word, are_words_related, get_contextual_definition, get_word_definition
-
-RESPONSE_CONFIG = {
-    'EMPTY': {
-        'code': 'EMPTY',
-        'message': '?',
-        'has_train': False
-    },
-    'RTS': {
-        'code': 'RTS',
-        'message': 'rts',
-        'has_train': False
-    },
-    'INVALID_WORD': {
-        'code': 'INVALID_WORD',
-        'message': "doesn't count",
-        'has_train': False
-    },
-    'DUPLICATE': {
-        'code': 'DUPLICATE',
-        'message': "we used {word} already",
-        'has_train': False
-    },
-    'SAME_WORD': {
-        'code': 'SAME_WORD',
-        'message': "we just used {word}",
-        'has_train': False
-    },
-    'TOO_SIMILAR': {
-        'code': 'TOO_SIMILAR',
-        'message': "isn't {word} too similar to {last_word}?",
-        'has_train': False
-    },
-    'UNRELATED': {
-        'code': 'UNRELATED',
-        'message': "{suggestion}",
-        'has_train': True
-    },
-    'NO_RELATION': {
-        'code': 'NO_RELATION',
-        'message': "new word pls?",
-        'has_train': False
-    },
-    'RESET': {
-        'code': 'RESET',
-        'message': "alright, give me a word",
-        'has_train': False
-    },
-    'ERROR': {
-        'code': 'ERROR',
-        'message': "?",
-        'has_train': False
-    }
-}
+from config_constants import RESPONSE_CONFIG
 
 def format_response_with_code(code, **kwargs):
     response_type = RESPONSE_CONFIG[code]
