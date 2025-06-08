@@ -1,7 +1,9 @@
-user rating training
-sentence based training
-storing model data
-applying model scoring system
+x user rating training
+x sentence based training
+
+better model storing
+bert not working
+mixing model with wordnet
 
 spellcheck
 pre exisintg scoring libraries
@@ -12,6 +14,5 @@ sentences
 ai
 voice chat
 voice model
-
 dark mode, only rts
 selectable letters

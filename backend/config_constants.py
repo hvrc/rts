@@ -57,7 +57,7 @@ DEFAULT_CONSTANTS = {
     'WORDNET_SISTER_WEIGHT': 0.15,
     'WORDNET_FREQUENCY_WEIGHT': 0.15,
     'WORDNET_CONCRETE_WEIGHT': 0.1,
-    'ENFORCE_RTS_RULE': False,
+    'ENFORCE_RTS_RULE': True,
 }
 
 def initialize_constants():
