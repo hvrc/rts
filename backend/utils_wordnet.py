@@ -1,7 +1,7 @@
 from nltk.corpus import wordnet
 from config_constants import (
     COMMON_WORDS, CONCRETE_INDICATORS, ABSTRACT_KEYWORDS, 
-    CONCRETE_ROOTS, BASE_SIMILARITY_THRESHOLD
+    CONCRETE_ROOTS, BASE_SIMILARITY_THRESHOLD, ENFORCE_RTS_RULE  # Add this
 )
 from config_storage import StorageManager
 from scorer_wordnet import is_concrete_noun
@@ -19,6 +19,9 @@ def is_valid_word(word):
     cleaned = re.sub(r'[^a-zA-Z]', '', word)
     if not cleaned:
         return False, "no letters"
+    
+    if ENFORCE_RTS_RULE and cleaned[0].lower() in {'r', 't', 's'}:
+        return False, "rts"
     
     if not wordnet.synsets(cleaned):
         return False, "not a word"
@@ -168,7 +171,7 @@ def get_bert_relations(word, train_of_thought=[]):
     return []
 
 def get_best_related_word(word, train_of_thought, game_state):
-    from config_constants import DEFAULT_CONSTANTS
+    from config_constants import DEFAULT_CONSTANTS, ENFORCE_RTS_RULE
     active_model = DEFAULT_CONSTANTS.get('ACTIVE_MODEL', 'trained')
     
     if active_model == 'trained':
