@@ -175,7 +175,7 @@ def get_best_related_word(word, train_of_thought, game_state):
         related_words = get_trained_relations(word, train_of_thought)
     elif active_model == 'wordnet':
         related_words = get_wordnet_relations(word, train_of_thought)
-    elif active_model == 'bert'::
+    elif active_model == 'bert':
         related_words = get_bert_relations(word, train_of_thought)
     
     scored_words = [
