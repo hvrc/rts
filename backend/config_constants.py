@@ -1,0 +1,20 @@
+from config_manager import get_constant
+
+PLAYER_THRESHOLD = get_constant('PLAYER_THRESHOLD')
+AI_THRESHOLD = get_constant('AI_THRESHOLD')
+SISTER_TERM_THRESHOLD = get_constant('SISTER_TERM_THRESHOLD')
+BASE_SIMILARITY_THRESHOLD = get_constant('BASE_SIMILARITY_THRESHOLD')
+
+WORDNET_WEIGHT = get_constant('WORDNET_WEIGHT')
+BERT_WEIGHT = get_constant('BERT_WEIGHT')
+
+MAX_RELATED_WORDS = get_constant('MAX_RELATED_WORDS')
+MAX_HYPONYMS = get_constant('MAX_HYPONYMS')
+MAX_HYPERNYMS = get_constant('MAX_HYPERNYMS')
+MAX_SISTERS = get_constant('MAX_SISTERS')
+MAX_SYNONYMS = get_constant('MAX_SYNONYMS')
+
+COMMON_WORDS = set(get_constant('COMMON_WORDS'))
+CONCRETE_ROOTS = set(get_constant('CONCRETE_ROOTS'))
+ABSTRACT_KEYWORDS = set(get_constant('ABSTRACT_KEYWORDS'))
+CONCRETE_INDICATORS = set(get_constant('CONCRETE_INDICATORS'))

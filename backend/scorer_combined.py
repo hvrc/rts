@@ -1,18 +1,24 @@
-from wordnet_scorer import WordNetScorer
-from bert_scorer import BertScorer
-from constants import WORDNET_WEIGHT, BERT_WEIGHT
+from scorer_wordnet import WordNetScorer
+from scorer_bert import BertScorer
+from scorer_trainable import TrainableScorer
+from config_constants import WORDNET_WEIGHT, BERT_WEIGHT
 
 class CombinedScorer:
     def __init__(self, wordnet_weight=WORDNET_WEIGHT, bert_weight=BERT_WEIGHT):
         self.wordnet_scorer = WordNetScorer()
         self.bert_scorer = BertScorer()
+        self.trainable_scorer = TrainableScorer()
         self.wordnet_weight = wordnet_weight
         self.bert_weight = bert_weight
     
     def get_similarity(self, word1, word2):
         wordnet_similarity = self.wordnet_scorer.get_similarity(word1, word2)
         bert_similarity = self.bert_scorer.get_similarity(word1, word2)
-        return (self.wordnet_weight * wordnet_similarity) + (self.bert_weight * bert_similarity)
+        learned_similarity = self.trainable_scorer.get_learned_score(word1, word2)
+        
+        return (self.wordnet_weight * wordnet_similarity + 
+                self.bert_weight * bert_similarity +
+                learned_similarity)
     
     def score_word(self, word, original_word, relation_type, similarity):
         wordnet_score = self.wordnet_scorer.score_word(word, original_word, relation_type, similarity)

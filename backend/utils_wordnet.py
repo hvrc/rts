@@ -1,8 +1,8 @@
 from nltk.corpus import wordnet
 import nltk
-from constants import COMMON_WORDS
-from combined_scorer import CombinedScorer
-from wordnet_scorer import is_concrete_noun
+from config_constants import COMMON_WORDS
+from scorer_combined import CombinedScorer
+from scorer_wordnet import is_concrete_noun
 
 nltk.download('wordnet')
 nltk.download('averaged_perceptron_tagger')

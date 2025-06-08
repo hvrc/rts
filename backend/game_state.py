@@ -1,7 +1,7 @@
-from wordnet_scorer import WordNetScorer
-from bert_scorer import BertScorer
-from combined_scorer import CombinedScorer
-from constants import PLAYER_THRESHOLD
+from scorer_wordnet import WordNetScorer
+from scorer_bert import BertScorer
+from scorer_combined import CombinedScorer
+from config_constants import PLAYER_THRESHOLD
 
 class GameState:
     def __init__(self, scorer_type="combined"):

@@ -1,6 +1,6 @@
 from nltk.corpus import wordnet
 import nltk
-from constants import COMMON_WORDS, CONCRETE_INDICATORS, ABSTRACT_KEYWORDS, CONCRETE_ROOTS
+from config_constants import COMMON_WORDS, CONCRETE_INDICATORS, ABSTRACT_KEYWORDS, CONCRETE_ROOTS
 
 def is_concrete_by_hypernyms(synset):
     try:

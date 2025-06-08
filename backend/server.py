@@ -1,19 +1,24 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from game_state import GameState
-from response_handler import format_response
+from game_response import format_response
+from config_manager import initialize_constants
 import os
 
 app = Flask(__name__)
 
 CORS(app, resources={
     r"/*": {
-        "origins": ["https://rts0-462101.ue.r.appspot.com", "http://localhost:5173"],
+        "origins": [
+            "https://rts0-462101.ue.r.appspot.com", 
+            "http://localhost:5001"
+        ],
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type"]
     }
 })
 
+initialize_constants()
 game_state = GameState()
 
 @app.route('/')

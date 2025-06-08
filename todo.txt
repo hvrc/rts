@@ -1,11 +1,23 @@
+user rating training
+sentence based training
+storing model data
+applying model scoring system
+
+Create MongoDB connection and schemas
+Build the trainable model structure
+Create training scripts that can run independently
+Add methods to save and load model states
+Create a testing system to validate improvements
+
 spellcheck
-new libraries
-rts database
+pre exisintg scoring libraries
 definition
 justification
 like, dislike
+sentences
 ai
 voice chat
 voice model
 
 dark mode, only rts
+selectable letters

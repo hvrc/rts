@@ -1,5 +1,5 @@
 from game_state import GameState
-from wordnet_utils import is_valid_word, is_word_contained, get_best_related_word, are_words_related, get_contextual_definition, get_word_definition
+from utils_wordnet import is_valid_word, is_word_contained, get_best_related_word, are_words_related, get_contextual_definition, get_word_definition
 
 RESPONSE_CONFIG = {
     'EMPTY': {

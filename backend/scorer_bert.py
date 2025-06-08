@@ -1,4 +1,4 @@
-from bert_utils import bert_embedder
+from utils_bert import bert_embedder
 
 class BertScorer:
     def get_similarity(self, word1, word2):
