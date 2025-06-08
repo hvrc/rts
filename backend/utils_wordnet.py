@@ -105,7 +105,8 @@ def get_trained_relations(word, train_of_thought=[]):
             ratings = data.get('ratings', [])
             rating_score = sum(r['rating'] for r in ratings) / len(ratings) if ratings else 0
             has_sentences = bool(data.get('sentences', []))
-            if rating_score > 0 or has_sentences:                related_words.append({
+            if rating_score > 0 or has_sentences:
+                related_words.append({
                     'word': related_word,
                     'reason': f"trained association with {word}",
                     'relation_type': 'trained',
@@ -127,7 +128,8 @@ def get_wordnet_relations(word, train_of_thought=[]):
         synonyms = [lemma.name().replace('_', '') for lemma in synset.lemmas()][:5]
         raw_words.extend(synonyms)
         for w in synonyms:
-            if w != word:                related_words.append({
+            if w != word:
+                related_words.append({
                     'word': w,
                     'reason': f"is a synonym of {word}",
                     'relation_type': 'synonym',
@@ -137,7 +139,8 @@ def get_wordnet_relations(word, train_of_thought=[]):
         
         hyponyms = [h.lemmas()[0].name().replace('_', '') for h in synset.hyponyms()][:20]
         raw_words.extend(hyponyms)
-        for w in hyponyms:            related_words.append({
+        for w in hyponyms:
+            related_words.append({
                 'word': w,
                 'reason': f"is a type of {word}",
                 'relation_type': 'hyponym',
@@ -147,7 +150,8 @@ def get_wordnet_relations(word, train_of_thought=[]):
         
         hypernyms = [h.lemmas()[0].name().replace('_', '') for h in synset.hypernyms()][:10]
         raw_words.extend(hypernyms)
-        for w in hypernyms:            related_words.append({
+        for w in hypernyms:
+            related_words.append({
                 'word': w,
                 'reason': f"is a more general category than {word}",
                 'relation_type': 'hypernym',
@@ -171,7 +175,7 @@ def get_best_related_word(word, train_of_thought, game_state):
         related_words = get_trained_relations(word, train_of_thought)
     elif active_model == 'wordnet':
         related_words = get_wordnet_relations(word, train_of_thought)
-    else:  # bert
+    elif active_model == 'bert'::
         related_words = get_bert_relations(word, train_of_thought)
     
     scored_words = [
