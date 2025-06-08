@@ -1,20 +1,8 @@
 from pymongo import MongoClient
-from pymongo.errors import ServerSelectionTimeoutError, AutoReconnect
+from pymongo.errors import ServerSelectionTimeoutError, AutoReconnect, DuplicateKeyError
 import os
 import time
-
-# Update MongoDB URI configuration
-MONGO_URI = os.getenv('MONGO_URI', 'mongodb://localhost:4999/')
-IS_PRODUCTION = os.getenv('GAE_ENV', '').startswith('standard')
-
-if IS_PRODUCTION:
-    # Use MongoDB Atlas URI in production
-    MONGO_URI = os.getenv('MONGODB_ATLAS_URI', '')
-    DB_NAME = 'rts_memory_prod'
-else:
-    # Use local MongoDB in development
-    MONGO_URI = 'mongodb://localhost:4999/'
-    DB_NAME = 'rts_memory_dev'
+from datetime import datetime
 
 class MockCollection:
     def __init__(self):
@@ -22,6 +10,9 @@ class MockCollection:
     
     def find_one(self, query):
         return None
+    
+    def find(self, query=None):
+        return []
     
     def update_one(self, query, update, upsert=False):
         pass
@@ -31,6 +22,12 @@ class MockCollection:
     
     def create_index(self, keys, **kwargs):
         pass
+    
+    def delete_many(self, query):
+        pass
+
+MONGO_URI = os.getenv('MONGODB_ATLAS_URI', 'mongodb://localhost:49999/')
+DB_NAME = 'rts_memory'
 
 MAX_RETRIES = 3
 RETRY_DELAY = 2
@@ -38,16 +35,41 @@ RETRY_DELAY = 2
 def get_database():
     for attempt in range(MAX_RETRIES):
         try:
+            print(f"Attempting to connect to MongoDB: {MONGO_URI}")
             client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
             client.server_info()
             db = client[DB_NAME]
+            
+            try:
+                db['word_pairs'].create_index([("word1", 1), ("word2", 1)], unique=True)
+                db['training_sentences'].create_index([("word1", 1), ("word2", 1)])
+                db['constants'].create_index([("name", 1)], unique=True)
+                print("Successfully created indexes")
+            except Exception as e:
+                print(f"Index creation warning (may already exist): {str(e)}")
+            
+            word_pairs = db['word_pairs']
+            test_doc = {
+                'word1': 'test',
+                'word2': 'connection',
+                'timestamp': datetime.now(),
+                'ratings': []
+            }
+            try:
+                if not word_pairs.find_one({'word1': 'test', 'word2': 'connection'}):
+                    word_pairs.insert_one(test_doc)
+                    print("Successfully inserted test data")
+                else:
+                    print("Test data already exists")
+            except DuplicateKeyError:
+                print("Test data already exists")
+            
             return db, client
-        except (AutoReconnect, ServerSelectionTimeoutError) as e:
+            
+        except Exception as e:
+            print(f"Connection attempt {attempt + 1} failed: {str(e)}")
             if attempt == MAX_RETRIES - 1:
                 print(f"Could not connect to MongoDB after {MAX_RETRIES} attempts")
-                print("Please ensure MongoDB is running locally")
-                print(f"Error: {str(e)}")
-                print("Using mock collections as fallback")
                 return None, None
             time.sleep(RETRY_DELAY)
 
@@ -66,9 +88,5 @@ if db is not None:
     training_history = db['training_history']
     constants = db['constants']
 
-    try:
-        word_pairs.create_index([("word1", 1), ("word2", 1)], unique=True)
-        training_sentences.create_index([("word1", 1), ("word2", 1)])
-        constants.create_index([("name", 1)], unique=True)
-    except Exception as e:
-        print(f"Error creating indexes: {str(e)}")
+# python train_model.py --mode sentence --word1 morning --word2 coffee --value "People drink coffee in the morning"
+# python train_model.py --mode sentence --word1 faze --word2 clan --value "Faze clan is a esports team"
