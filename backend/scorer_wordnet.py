@@ -1,6 +1,11 @@
 from nltk.corpus import wordnet
 import nltk
-from config_constants import COMMON_WORDS, CONCRETE_INDICATORS, ABSTRACT_KEYWORDS, CONCRETE_ROOTS
+from config_constants import (
+    COMMON_WORDS, CONCRETE_INDICATORS, ABSTRACT_KEYWORDS, CONCRETE_ROOTS,
+    WORDNET_SIMILARITY_WEIGHT, WORDNET_HYPONYM_WEIGHT,
+    WORDNET_HYPERNYM_WEIGHT, WORDNET_SISTER_WEIGHT,
+    WORDNET_FREQUENCY_WEIGHT, WORDNET_CONCRETE_WEIGHT
+)
 
 def is_concrete_by_hypernyms(synset):
     try:
@@ -28,12 +33,12 @@ def is_concrete_noun(word):
 
 class WordNetScorer:
     def __init__(self):
-        self.similarity_weight = 0.4
-        self.hyponym_weight = 0.2
-        self.hypernym_weight = 0.2
-        self.sister_weight = 0.15
-        self.frequency_weight = 0.15
-        self.concrete_weight = 0.1
+        self.similarity_weight = WORDNET_SIMILARITY_WEIGHT
+        self.hyponym_weight = WORDNET_HYPONYM_WEIGHT
+        self.hypernym_weight = WORDNET_HYPERNYM_WEIGHT
+        self.sister_weight = WORDNET_SISTER_WEIGHT
+        self.frequency_weight = WORDNET_FREQUENCY_WEIGHT
+        self.concrete_weight = WORDNET_CONCRETE_WEIGHT
     
     def get_similarity(self, word1, word2):
         synsets1 = wordnet.synsets(word1, pos=[wordnet.NOUN, wordnet.ADJ])

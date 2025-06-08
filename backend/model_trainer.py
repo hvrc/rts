@@ -1,17 +1,18 @@
-from config_db import word_pairs, training_sentences, model_weights
+from config_storage import StorageManager
 import argparse
 from datetime import datetime
+
+storage = StorageManager()
 
 # train model using an explanatory sentence
 def train_from_sentence(word1, word2, sentence):
     try:
-        training_sentences.insert_one({
-            'word1': word1.lower(),
-            'word2': word2.lower(),
-            'sentence': sentence,
-            'timestamp': datetime.now()
-        })
-        print(f"Added training sentence for {word1}-{word2}")
+        storage.add_word_pair(word1, word2, sentence=sentence)
+        weights = storage.load_model_weights()
+        print(f"\nAdded training sentence for {word1}-{word2}")
+        print(f"Training iterations: {weights['training_iterations']}")
+        print(f"Accuracy: {(weights['correct_predictions']/weights['total_predictions']*100):.2f}%" 
+              if weights['total_predictions'] > 0 else "No predictions yet")
         return True
     except Exception as e:
         print(f"Error adding sentence: {str(e)}")
@@ -20,18 +21,7 @@ def train_from_sentence(word1, word2, sentence):
 # train model using a rating (0 or 1)
 def train_from_rating(word1, word2, rating):
     try:
-        word_pairs.update_one(
-            {'word1': word1.lower(), 'word2': word2.lower()},
-            {
-                '$push': {
-                    'ratings': {
-                        'rating': float(rating),
-                        'timestamp': datetime.now()
-                    }
-                }
-            },
-            upsert=True
-        )
+        storage.add_word_pair(word1, word2, rating=float(rating))
         print(f"Added rating {rating} for {word1}-{word2}")
         return True
     except Exception as e:

@@ -1,30 +1,43 @@
 from scorer_wordnet import WordNetScorer
 from scorer_bert import BertScorer
 from scorer_trainable import TrainableScorer
-from config_constants import WORDNET_WEIGHT, BERT_WEIGHT
+from config_constants import BASE_SIMILARITY_THRESHOLD, WORDNET_WEIGHT, BERT_WEIGHT
 
 class CombinedScorer:
-    def __init__(self, wordnet_weight=WORDNET_WEIGHT, bert_weight=BERT_WEIGHT):
+    def __init__(self):
         self.wordnet_scorer = WordNetScorer()
         self.bert_scorer = BertScorer()
         self.trainable_scorer = TrainableScorer()
-        self.wordnet_weight = wordnet_weight
-        self.bert_weight = bert_weight
     
     def get_similarity(self, word1, word2):
-        wordnet_similarity = self.wordnet_scorer.get_similarity(word1, word2)
-        bert_similarity = self.bert_scorer.get_similarity(word1, word2)
-        learned_similarity = self.trainable_scorer.get_learned_score(word1, word2)
+        wordnet_sim = self.wordnet_scorer.get_similarity(word1, word2)
+        bert_sim = self.bert_scorer.get_similarity(word1, word2)
+        learned_sim = self.trainable_scorer.get_learned_score(word1, word2)
+
+        weights = self.trainable_scorer.weights
+        final_score = (
+            wordnet_sim * WORDNET_WEIGHT * weights['wordnet_base'] +
+            bert_sim * BERT_WEIGHT * weights['bert_base'] +
+            learned_sim
+        )
         
-        return (self.wordnet_weight * wordnet_similarity + 
-                self.bert_weight * bert_similarity +
-                learned_similarity)
+        return final_score
     
     def score_word(self, word, original_word, relation_type, similarity):
         wordnet_score = self.wordnet_scorer.score_word(word, original_word, relation_type, similarity)
         bert_score = self.bert_scorer.score_word(word, original_word)
-        return (self.wordnet_weight * wordnet_score) + (self.bert_weight * bert_score)
+        learned_score = self.trainable_scorer.get_learned_score(word, original_word)
+        
+        weights = self.trainable_scorer.weights
+        final_score = (
+            wordnet_score * WORDNET_WEIGHT * weights['wordnet_base'] +
+            bert_score * BERT_WEIGHT * weights['bert_base'] +
+            learned_score * weights['user_feedback'] +
+            similarity * weights['sentence_context']
+        )
+        
+        return final_score
     
     def are_words_related(self, word1, word2):
         similarity = self.get_similarity(word1, word2)
-        return similarity >= 0.2, similarity
+        return similarity >= BASE_SIMILARITY_THRESHOLD, similarity

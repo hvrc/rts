@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from game_state import GameState
 from game_response import format_response
-from config_manager import initialize_constants
+from config_constants import initialize_constants
 import os
 
 app = Flask(__name__)

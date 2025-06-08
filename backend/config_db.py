@@ -1,92 +1,64 @@
-from pymongo import MongoClient
-from pymongo.errors import ServerSelectionTimeoutError, AutoReconnect, DuplicateKeyError
 import os
-import time
+import pickle
 from datetime import datetime
+import time
 
-class MockCollection:
-    def __init__(self):
-        self.data = {}
+class LocalCollection:
+    def __init__(self, name):
+        self.name = name
+        self.data_dir = "model_rts_1"
+        self.file_path = os.path.join(self.data_dir, f"{name}.pkl")
+        self._initialize_storage()
+        
+    def _initialize_storage(self):
+        if not os.path.exists(self.data_dir):
+            os.makedirs(self.data_dir)
+        if not os.path.exists(self.file_path):
+            self._save_data({})
+    
+    def _load_data(self):
+        try:
+            with open(self.file_path, 'rb') as f:
+                return pickle.load(f)
+        except:
+            return {}
+            
+    def _save_data(self, data):
+        with open(self.file_path, 'wb') as f:
+            pickle.dump(data, f)
     
     def find_one(self, query):
-        return None
-    
-    def find(self, query=None):
-        return []
+        data = self._load_data()
+        key, value = next(iter(query.items()))
+        return next((item for item in data.values() if item.get(key) == value), None)
     
     def update_one(self, query, update, upsert=False):
-        pass
+        data = self._load_data()
+        key, value = next(iter(query.items()))
+        item = next((item for item in data.values() if item.get(key) == value), None)
+        
+        if item is None and upsert:
+            doc_id = str(len(data) + 1)
+            item = query.copy()
+            item.update(update.get('$set', {}))
+            data[doc_id] = item
+        elif item is not None:
+            item.update(update.get('$set', {}))
+            
+        self._save_data(data)
     
     def insert_one(self, document):
-        pass
+        data = self._load_data()
+        doc_id = str(len(data) + 1)
+        document['_id'] = doc_id
+        data[doc_id] = document
+        self._save_data(data)
     
     def create_index(self, keys, **kwargs):
         pass
-    
-    def delete_many(self, query):
-        pass
 
-MONGO_URI = os.getenv('MONGODB_ATLAS_URI', 'mongodb://localhost:49999/')
-DB_NAME = 'rts_memory'
-
-MAX_RETRIES = 3
-RETRY_DELAY = 2
-
-def get_database():
-    for attempt in range(MAX_RETRIES):
-        try:
-            print(f"Attempting to connect to MongoDB: {MONGO_URI}")
-            client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
-            client.server_info()
-            db = client[DB_NAME]
-            
-            try:
-                db['word_pairs'].create_index([("word1", 1), ("word2", 1)], unique=True)
-                db['training_sentences'].create_index([("word1", 1), ("word2", 1)])
-                db['constants'].create_index([("name", 1)], unique=True)
-                print("Successfully created indexes")
-            except Exception as e:
-                print(f"Index creation warning (may already exist): {str(e)}")
-            
-            word_pairs = db['word_pairs']
-            test_doc = {
-                'word1': 'test',
-                'word2': 'connection',
-                'timestamp': datetime.now(),
-                'ratings': []
-            }
-            try:
-                if not word_pairs.find_one({'word1': 'test', 'word2': 'connection'}):
-                    word_pairs.insert_one(test_doc)
-                    print("Successfully inserted test data")
-                else:
-                    print("Test data already exists")
-            except DuplicateKeyError:
-                print("Test data already exists")
-            
-            return db, client
-            
-        except Exception as e:
-            print(f"Connection attempt {attempt + 1} failed: {str(e)}")
-            if attempt == MAX_RETRIES - 1:
-                print(f"Could not connect to MongoDB after {MAX_RETRIES} attempts")
-                return None, None
-            time.sleep(RETRY_DELAY)
-
-db, client = get_database()
-
-word_pairs = MockCollection()
-training_sentences = MockCollection()
-model_weights = MockCollection()
-training_history = MockCollection()
-constants = MockCollection()
-
-if db is not None:
-    word_pairs = db['word_pairs']
-    training_sentences = db['training_sentences']
-    model_weights = db['model_weights']
-    training_history = db['training_history']
-    constants = db['constants']
-
-# python train_model.py --mode sentence --word1 morning --word2 coffee --value "People drink coffee in the morning"
-# python train_model.py --mode sentence --word1 faze --word2 clan --value "Faze clan is a esports team"
+word_pairs = LocalCollection('word_pairs')
+training_sentences = LocalCollection('training_sentences')
+model_weights = LocalCollection('model_weights') 
+training_history = LocalCollection('training_history')
+constants = LocalCollection('constants')
