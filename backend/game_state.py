@@ -1,20 +1,18 @@
 from scorer_wordnet import WordNetScorer
-from scorer_bert import BertScorer
-from scorer_combined import CombinedScorer
-from config_constants import PLAYER_THRESHOLD
+from scorer_trainable import TrainableScorer
+from config_constants import PLAYER_THRESHOLD, get_constant
 
 class GameState:
-    def __init__(self, scorer_type="combined"):
-        self.scorer_type = scorer_type
-        self.scorer = self._initialize_scorer(scorer_type)
+    def __init__(self):
         self.reset()
+        active_model = get_constant('ACTIVE_MODEL')
+        self.scorer_type = active_model
+        self.scorer = self._initialize_scorer(active_model)
     
     def _initialize_scorer(self, scorer_type):
-        if scorer_type == "wordnet":
-            return WordNetScorer()
-        elif scorer_type == "bert":
-            return BertScorer()
-        return CombinedScorer()
+        if scorer_type == "trained":
+            return TrainableScorer()
+        return WordNetScorer()
     
     def reset(self):
         self.last_word = None

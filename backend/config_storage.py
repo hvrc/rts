@@ -50,7 +50,6 @@ class StorageManager:
         with open(self._get_file_path(name), 'wb') as f:
             pickle.dump(data, f)
     
-    # Collection-like operations
     def find_one(self, collection, query):
         data = self._load_data(collection)
         key, value = next(iter(query.items()))
@@ -78,7 +77,6 @@ class StorageManager:
         data[doc_id] = document
         self._save_data(collection, data)
     
-    # Specific data operations
     def load_word_pairs(self):
         return self._load_data('word_pairs')
     
@@ -118,7 +116,6 @@ class StorageManager:
             
         self.save_word_pairs(pairs)
 
-# Create singleton instances
 storage_manager = StorageManager()
 word_pairs = storage_manager
 training_sentences = storage_manager

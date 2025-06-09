@@ -48,8 +48,8 @@ DEFAULT_CONSTANTS = {
         'box', 'bag', 'fossil', 'statue', 'coin', 'jewel', 'gem', 'crystal', 'fiber'
     ],
 
-    # wordnet, bert, or trained
-    'ACTIVE_MODEL': 'wordnet',
+    # wordnet, trained
+    'ACTIVE_MODEL': '',
     
     'WORDNET_SIMILARITY_WEIGHT': 0.4,
     'WORDNET_HYPONYM_WEIGHT': 0.2,
@@ -163,9 +163,6 @@ PLAYER_THRESHOLD = get_constant('PLAYER_THRESHOLD')
 AI_THRESHOLD = get_constant('AI_THRESHOLD')
 SISTER_TERM_THRESHOLD = get_constant('SISTER_TERM_THRESHOLD')
 BASE_SIMILARITY_THRESHOLD = get_constant('BASE_SIMILARITY_THRESHOLD')
-
-WORDNET_WEIGHT = get_constant('WORDNET_WEIGHT')
-BERT_WEIGHT = get_constant('BERT_WEIGHT')
 
 MAX_RELATED_WORDS = get_constant('MAX_RELATED_WORDS')
 MAX_HYPONYMS = get_constant('MAX_HYPONYMS')

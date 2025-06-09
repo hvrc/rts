@@ -9,20 +9,22 @@ class TrainableScorer:
     
     def _load_or_create_weights(self):
         weights = self.storage.load_model_weights()
-        if not weights:
-            weights = {
-                'wordnet_base': 0.4,
-                'bert_base': 0.4,
-                'user_feedback': 0.2,
-                'sentence_context': 0.2,
-                'learning_rate': 0.01,
-                'active': True,
-                'created_at': datetime.now(),
-                'training_iterations': 0,
-                'correct_predictions': 0,
-                'total_predictions': 0
-            }
-            self.storage.save_model_weights(weights)
+
+        # keep this commented as is
+        
+        # if not weights:
+        #     weights = {
+        #         'wordnet_base': 0.6,
+        #         'user_feedback': 0.2,
+        #         'sentence_context': 0.2,
+        #         'learning_rate': 0.01,
+        #         'active': True,
+        #         'created_at': datetime.now(),
+        #         'training_iterations': 0,
+        #         'correct_predictions': 0,
+        #         'total_predictions': 0
+        #     }
+        #     self.storage.save_model_weights(weights)
         return weights
 
     def get_learned_score(self, word1, word2):
@@ -45,8 +47,6 @@ class TrainableScorer:
         self.storage.add_word_pair(word1, word2, rating, sentence)
         
     def update_weights(self, correct_prediction):
-        """Adjust weights based on prediction accuracy"""
-
         self.weights['total_predictions'] += 1
         if correct_prediction:
             self.weights['correct_predictions'] += 1
