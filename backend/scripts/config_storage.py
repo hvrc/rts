@@ -39,37 +39,32 @@ class StorageManager:
             'correct_predictions': 0,
             'total_predictions': 0
         })
+        
     def _get_file_path(self, name):
         file_path = os.path.join(self.data_dir, f"{name}.pkl")
         # Normalize path for Windows
         return os.path.normpath(file_path)
-    
+
     def _load_data(self, name):
         try:
             file_path = self._get_file_path(name)
-            print(f"[StorageManager] Loading from: {file_path}")
             with open(file_path, 'rb') as f:
                 return pickle.load(f)
         except FileNotFoundError:
-            print(f"[StorageManager] File not found: {file_path}, returning empty dict")
             return {}
         except Exception as e:
-            print(f"[StorageManager] Error loading {name}: {str(e)}")
             return {}
     
     def _save_data(self, name, data):
         try:
             file_path = self._get_file_path(name)
-            print(f"[StorageManager] Saving to: {file_path}")
             
             # Ensure directory exists
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             
             with open(file_path, 'wb') as f:
                 pickle.dump(data, f)
-            print(f"[StorageManager] Successfully saved {name}")
         except Exception as e:
-            print(f"[StorageManager] Error saving {name}: {str(e)}")
             raise
     
     def load_word_pairs(self):

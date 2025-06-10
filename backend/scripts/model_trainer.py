@@ -24,17 +24,18 @@ def update_rating(word1, word2, rating_change):
                 'created_at': datetime.now()
             }
             pair_data = pairs[key]
-            print(f"Created new pair {word1}-{word2} with initial score 0.5")
         
         # Get current score (default to 0.5 if not found)
         current_score = pair_data.get('total_score', 0.5)
         
         # Calculate new score by adding/subtracting the rating change
         new_total = max(0, min(1, current_score + rating_change))
+        actual_change = new_total - current_score
         
         # Add the rating event with change details
         pair_data['ratings'].append({
             'rating_change': rating_change,
+            'actual_change': actual_change,
             'previous_score': current_score,
             'new_score': new_total,
             'timestamp': datetime.now()
@@ -42,15 +43,13 @@ def update_rating(word1, word2, rating_change):
         
         # Update the total score
         pair_data['total_score'] = new_total
-        
-        # Save updated pairs
+          # Save updated pairs
         storage.save_word_pairs(pairs)
-        print(f"Updated score for {word1}-{word2}: {current_score} -> {new_total} (change: {rating_change})")
-        return True
+        return {'new_score': new_total, 'change': actual_change, 'previous_score': current_score}
         
     except Exception as e:
         print(f"Error updating rating: {str(e)}")
-        return False
+        return None
 
 # Keep existing functions for backward compatibility
 def train_from_sentence(word1, word2, sentence):
@@ -73,7 +72,7 @@ def train_from_rating(word1, word2, rating):
         return update_rating(word1, word2, rating_change)
     except Exception as e:
         print(f"Error adding rating: {str(e)}")
-        return False
+        return None
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train the RTS model")

@@ -7,12 +7,9 @@ def load_json_config(filename):
     config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', filename)
     try:
         with open(config_path, 'r') as f:
-            print(f"Loading configuration from {config_path}")
             data = json.load(f)
-            print(f"Successfully loaded {len(data)} settings from {filename}")
             return data
     except Exception as e:
-        print(f"Error loading {filename}: {str(e)}")
         return {}
 
 # Load configurations from JSON files
@@ -30,7 +27,6 @@ def initialize_constants():
     """Initialize constants in runtime storage"""
     global _runtime_constants
     _runtime_constants = ALL_CONSTANTS.copy()
-    print(f"Initialized {len(_runtime_constants)} constants")
 
 def get_constant(name):
     """Get constant from runtime storage with fallback to defaults"""
@@ -46,10 +42,8 @@ def update_constant(name, value):
         if not _runtime_constants:
             initialize_constants()
         _runtime_constants[name] = value
-        print(f"Updated constant {name} = {value}")
         return True
     except Exception as e:
-        print(f"Error updating constant {name}: {str(e)}")
         return False
 
 # Initialize constants on module load

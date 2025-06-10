@@ -60,12 +60,12 @@ class GameState:
         self.conversation_count = 0   # Index counter for conversation
         self.debug_enabled = True
         self.player_similarity_threshold = PLAYER_THRESHOLD
-        self._debug("Game state reset - word history cleared")
+        # self._debug("Game state reset - word history cleared")
     
     def add_word(self, word, sender='user'):
         """Add word to conversation history with proper linking"""
         word = word.lower()
-        self._debug(f"Adding word: '{word}' from {sender}")
+        # self._debug(f"Adding word: '{word}' from {sender}")
         
         # Check for user word duplicates only
         if sender == 'user':
@@ -87,13 +87,10 @@ class GameState:
         if word not in self.word_index:
             self.word_index[word] = []
         self.word_index[word].append(entry)
-        
-        # Update references
+          # Update references
         self.last_entry = entry
         self.conversation_count += 1
         
-        self._debug(f"Word added successfully. Total words: {len(self.word_history)}")
-        self._debug_conversation_state()
         return True
     
     def get_word_entries(self, word):

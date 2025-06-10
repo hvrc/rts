@@ -34,8 +34,6 @@ def echo():
         data = request.json
         message = data.get('message', '')
         
-        print(f"[Server] Processing user message: {message}")
-        
         # Process response first to validate the word
         response = format_response(message, game_state)
         
@@ -45,12 +43,7 @@ def echo():
         ]
         
         if user_word_valid:
-            if game_state.add_word(message, 'user'):
-                print(f"[Server] Added user word to history: {message}")
-            else:
-                print(f"[Server] Failed to add user word to history: {message}")
-        else:
-            print(f"[Server] User word rejected ({response.get('response_code')}): {message}")
+            game_state.add_word(message, 'user')
         
         # Only add bot's response to history if it should be trained (has_train=true)
         response_config = RESPONSE_CONFIG.get(response.get('response_code', ''), {})
@@ -59,12 +52,7 @@ def echo():
         if should_add_bot_response and response.get('response'):
             # For UNRELATED responses, the actual word is in the response
             bot_word = response['response']
-            if game_state.add_word(bot_word, 'bot'):
-                print(f"[Server] Added bot word to history: {bot_word}")
-            else:
-                print(f"[Server] Failed to add bot word to history: {bot_word}")
-        else:
-            print(f"[Server] Bot response not added to history ({response.get('response_code')}): {response.get('response')}")
+            game_state.add_word(bot_word, 'bot')
         
         return jsonify({
             'response': response['response'],
@@ -72,7 +60,6 @@ def echo():
             'response_code': response.get('response_code', '')
         }), 200
     except Exception as e:
-        print(f"[Server] Error in echo: {str(e)}")
         return jsonify({
             'response': 'Error processing request',
             'train_of_thought': [],
@@ -82,7 +69,6 @@ def echo():
 
 @app.route('/reset', methods=['POST'])
 def reset():
-    print("[Server] Resetting game state...")
     game_state.reset()
     response = format_response('reset', game_state)
     return jsonify({
@@ -97,17 +83,14 @@ def remove_question():
         data = request.json
         current_word = data.get('word')
         
-        print(f"[Server] Removing question mark for word: {current_word}")
-        
         # Find the word entry and get its pair
         context = game_state.find_word_context(current_word)
-        if context and context['previous_word']:
-            # Add 0.1 to rating when question mark is removed
-            rating_change = 0.1
-            update_rating(context['previous_word'], current_word, rating_change)
-            print(f"[Server] Added {rating_change} to score: {context['previous_word']} -> {current_word}")
-        else:
-            print(f"[Server] Could not find context for word: {current_word}")
+        if context and context['previous_word']:            # Add 0.2 to rating when question mark is removed
+            rating_change = 0.2
+            result = update_rating(context['previous_word'], current_word, rating_change)
+            if result:
+                change_text = "increased" if result['change'] > 0 else "decreased"
+                print(f"{context['previous_word']} -> {current_word}: score {change_text} from {result['previous_score']:.3f} to {result['new_score']:.3f}")
         
         return jsonify({
             'success': True,
@@ -115,7 +98,6 @@ def remove_question():
         }), 200
     
     except Exception as e:
-        print(f"[Server] Error in remove_question: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -128,17 +110,14 @@ def update_rating_route():
         current_word = data.get('word')
         is_like = data.get('rating', 0.0) == 1.0
         
-        print(f"[Server] Rating update for word: {current_word}, like: {is_like}")
-        
         # Find the word entry and get its pair
         context = game_state.find_word_context(current_word)
-        if context and context['previous_word']:
-            # Add 0.1 for like, subtract 0.1 for dislike
+        if context and context['previous_word']:            # Add 0.1 for like, subtract 0.1 for dislike
             rating_change = 0.1 if is_like else -0.1
-            update_rating(context['previous_word'], current_word, rating_change)
-            print(f"[Server] {'Added' if is_like else 'Subtracted'} 0.1 from score: {context['previous_word']} -> {current_word}")
-        else:
-            print(f"[Server] Could not find context for word: {current_word}")
+            result = update_rating(context['previous_word'], current_word, rating_change)
+            if result:
+                change_text = "increased" if result['change'] > 0 else "decreased"
+                print(f"{context['previous_word']} -> {current_word}: score {change_text} from {result['previous_score']:.3f} to {result['new_score']:.3f}")
         
         return jsonify({
             'success': True,
@@ -146,7 +125,6 @@ def update_rating_route():
         }), 200
     
     except Exception as e:
-        print(f"[Server] Error in update_rating: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)
