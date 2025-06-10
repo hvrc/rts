@@ -31,10 +31,14 @@ def get_best_related_word(word, train_of_thought, game_state):
         trained_words = get_trained_relations(word, train_of_thought)
         if trained_words:
             related_words = trained_words
-        
+    
+    # Get all words used so far
+    conversation_history = game_state.get_conversation_history()
+    used_words = set(entry['word'] for entry in conversation_history)
+    
     scored_words = [
         w for w in related_words 
-        if w['word'] not in game_state.word_history 
+        if w['word'] not in used_words 
         and is_valid_word(w['word'])[0]
         and not is_word_contained(word, w['word'])
     ]

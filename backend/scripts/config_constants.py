@@ -1,7 +1,6 @@
 import os
 import json
 from datetime import datetime
-from .config_storage import storage_manager
 
 def load_json_config(filename):
     """Load a JSON configuration file from the config directory"""
@@ -24,46 +23,33 @@ RESPONSE_CONFIG = load_json_config('responses.json')
 # Combine all constants
 ALL_CONSTANTS = {**CONSTANTS, **MODEL_WEIGHTS}
 
+# In-memory storage for runtime constants
+_runtime_constants = {}
+
 def initialize_constants():
-    """Initialize constants in local storage"""
-    for name, value in ALL_CONSTANTS.items():
-        try:
-            stored = storage_manager.find_one('constants', {'name': name})
-            if stored is None:
-                storage_manager.insert_one('constants', {
-                    'name': name,
-                    'value': value,
-                    'created_at': datetime.now(),
-                    'updated_at': datetime.now()
-                })
-        except Exception as e:
-            pass
+    """Initialize constants in runtime storage"""
+    global _runtime_constants
+    _runtime_constants = ALL_CONSTANTS.copy()
+    print(f"Initialized {len(_runtime_constants)} constants")
 
 def get_constant(name):
-    """Get constant from local storage with fallback to defaults"""
-    try:
-        constant = storage_manager.find_one('constants', {'name': name})
-        return constant['value'] if constant else ALL_CONSTANTS.get(name)
-    except Exception as e:
-        return ALL_CONSTANTS.get(name)
+    """Get constant from runtime storage with fallback to defaults"""
+    global _runtime_constants
+    if not _runtime_constants:
+        initialize_constants()
+    return _runtime_constants.get(name, ALL_CONSTANTS.get(name))
 
 def update_constant(name, value):
-    """Update constant in local storage"""
+    """Update constant in runtime storage"""
+    global _runtime_constants
     try:
-        now = datetime.now()
-        storage_manager.update_one(
-            'constants',
-            {'name': name},
-            {
-                '$set': {
-                    'value': value,
-                    'updated_at': now
-                }
-            },
-            upsert=True
-        )
+        if not _runtime_constants:
+            initialize_constants()
+        _runtime_constants[name] = value
+        print(f"Updated constant {name} = {value}")
         return True
     except Exception as e:
+        print(f"Error updating constant {name}: {str(e)}")
         return False
 
 # Initialize constants on module load

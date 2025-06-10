@@ -28,9 +28,13 @@
         "code": "TOO_SIMILAR",
         "message": "isn't {word} too similar to {last_word}?",
         "has_train": false
-    },
-    "UNRELATED": {
+    },    "UNRELATED": {
         "code": "UNRELATED",
+        "message": "{suggestion}",
+        "has_train": true
+    },
+    "RELATED": {
+        "code": "RELATED",
         "message": "{suggestion}",
         "has_train": true
     },
