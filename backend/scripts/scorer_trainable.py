@@ -1,4 +1,4 @@
-from config_storage import StorageManager
+from .config_storage import StorageManager
 import numpy as np
 from datetime import datetime
 
@@ -56,11 +56,12 @@ class TrainableScorer:
             self.weights['user_feedback'] *= (1 - self.weights['learning_rate'])
             self.weights['sentence_context'] *= (1 - self.weights['learning_rate'])
         
+        # Remove bert_base from normalization
         total = sum(w for k, w in self.weights.items() 
-                    if k not in ['learning_rate', 'active', 'created_at', 
-                                 'training_iterations', 'correct_predictions', 'total_predictions'])
+                    if k in ['wordnet_base', 'user_feedback', 'sentence_context'])
         
-        for key in ['wordnet_base', 'bert_base', 'user_feedback', 'sentence_context']:
+        # Normalize remaining weights
+        for key in ['wordnet_base', 'user_feedback', 'sentence_context']:
             self.weights[key] /= total
         
         self.weights['training_iterations'] += 1

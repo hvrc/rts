@@ -1,0 +1,32 @@
+{
+    "MAX_RELATED_WORDS": 100,
+    "MAX_HYPONYMS": 50,
+    "MAX_HYPERNYMS": 30,
+    "MAX_SISTERS": 3,
+    "MAX_SYNONYMS": 20,
+    "MAX_SYNONYMS_PER_SYNSET": 20,
+    "MAX_HYPONYMS_PER_SYNSET": 50,
+    "MAX_HYPERNYMS_PER_SYNSET": 30,
+    "WORD_SEPARATOR": "_",
+    "WORD_SEPARATOR_REPLACEMENT": "",
+    "COMMON_WORDS": [
+        "dog", "cat", "house", "book", "food", "water", "bed", "chair", "phone", "car",
+        "door", "box", "cup", "desk", "bird", "fish", "hand", "key", "milk", "paper",
+        "coin", "glass", "mouth", "nose", "ball", "eye", "beach"
+    ],
+    "CONCRETE_ROOTS": [
+        "physical_entity.n.01", "matter.n.03", "artifact.n.01", "natural_object.n.01",
+        "organism.n.01", "plant.n.02", "animal.n.01", "substance.n.01", "food.n.01",
+        "object.n.01", "structure.n.01", "body_part.n.01"
+    ],
+    "ABSTRACT_KEYWORDS": [
+        "abstract", "quality", "state", "condition", "feeling", "emotion", "concept",
+        "idea", "activity", "action", "process", "phenomenon", "manner", "way", "belief"
+    ],
+    "CONCRETE_INDICATORS": [
+        "object", "thing", "item", "entity", "physical", "material", "substance",
+        "structure", "device", "tool", "container", "animal", "plant", "machine"
+    ],
+    "ENFORCE_RTS_RULE": false,
+    "ACTIVE_MODEL": ""
+}

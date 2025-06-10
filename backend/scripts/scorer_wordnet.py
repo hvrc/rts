@@ -1,6 +1,5 @@
 from nltk.corpus import wordnet
-import nltk
-from config_constants import (
+from .config_constants import (
     COMMON_WORDS, CONCRETE_INDICATORS, ABSTRACT_KEYWORDS, CONCRETE_ROOTS,
     WORDNET_SIMILARITY_WEIGHT, WORDNET_HYPONYM_WEIGHT,
     WORDNET_HYPERNYM_WEIGHT, WORDNET_SISTER_WEIGHT,

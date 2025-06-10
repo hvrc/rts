@@ -1,8 +1,8 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from game_state import GameState
-from game_response import format_response
-from config_constants import initialize_constants, get_constant, update_constant
+from scripts.game_state import GameState
+from scripts.game_response import format_response
+from scripts.config_constants import initialize_constants, get_constant, update_constant
 import os
 
 app = Flask(__name__)
@@ -18,8 +18,8 @@ CORS(app, resources={
     }
 })
 
+initialize_constants()  # Initialize all constants first
 update_constant('ACTIVE_MODEL', 'wordnet')
-initialize_constants()
 game_state = GameState()
 
 @app.route('/')

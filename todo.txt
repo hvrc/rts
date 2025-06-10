@@ -16,3 +16,5 @@ voice chat
 voice model
 dark mode, only rts
 selectable letters
+
+mean weight for each word based on how often people connect them

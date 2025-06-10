@@ -1,6 +1,6 @@
-from scorer_wordnet import WordNetScorer
-from scorer_trainable import TrainableScorer
-from config_constants import PLAYER_THRESHOLD, get_constant
+from .scorer_wordnet import WordNetScorer
+from .scorer_trainable import TrainableScorer
+from .config_constants import PLAYER_THRESHOLD, get_constant
 
 class GameState:
     def __init__(self):
@@ -18,7 +18,7 @@ class GameState:
         self.last_word = None
         self.last_reason = None
         self.last_similarity = None
-        self.word_history = set()
+        self.word_history = set()   
         self.player_similarity_threshold = PLAYER_THRESHOLD
     
     def add_word(self, word):

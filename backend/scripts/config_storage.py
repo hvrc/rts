@@ -24,12 +24,11 @@ class StorageManager:
         """Set up default data structures"""
         self.save_word_pairs({})
         self.save_model_weights({
-            'wordnet_base': 0.4,
-            'bert_base': 0.4,
-            'user_feedback': 0.2,
-            'sentence_context': 0.2,
-            'learning_rate': 0.01,
-            'active': True,
+            'wordnet_base': get_constant('INITIAL_WORDNET_BASE'),
+            'user_feedback': get_constant('INITIAL_USER_FEEDBACK'),
+            'sentence_context': get_constant('INITIAL_SENTENCE_CONTEXT'),
+            'learning_rate': get_constant('INITIAL_LEARNING_RATE'),
+            'active': get_constant('INITIAL_MODEL_ACTIVE'),
             'created_at': datetime.now(),
             'training_iterations': 0,
             'correct_predictions': 0,

@@ -1,11 +1,11 @@
-from game_state import GameState
-from utils_wordnet import (
+from .game_state import GameState
+from .utils_wordnet import (
     is_valid_word, is_word_contained, get_wordnet_relations,
     get_contextual_definition, get_word_definition, get_wordnet_similarity
 )
-from utils_common import get_best_related_word
-from utils_trained import get_trained_relations, get_trained_similarity
-from config_constants import RESPONSE_CONFIG, get_constant
+from .utils_common import get_best_related_word
+from .utils_trained import get_trained_relations, get_trained_similarity
+from .config_constants import RESPONSE_CONFIG, get_constant
 
 # scorer = CombinedScorer()  # Remove this line
 

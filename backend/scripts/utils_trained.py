@@ -1,4 +1,4 @@
-from config_storage import StorageManager
+from .config_storage import StorageManager
 
 def get_trained_similarity(word1, word2):
     storage = StorageManager()

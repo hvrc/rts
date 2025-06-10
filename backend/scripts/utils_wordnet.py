@@ -1,9 +1,13 @@
 from nltk.corpus import wordnet
-from config_constants import (
+from .config_constants import (
     COMMON_WORDS, CONCRETE_INDICATORS, ABSTRACT_KEYWORDS, 
-    CONCRETE_ROOTS, BASE_SIMILARITY_THRESHOLD, ENFORCE_RTS_RULE
+    CONCRETE_ROOTS, BASE_SIMILARITY_THRESHOLD, ENFORCE_RTS_RULE,
+    WORDNET_SYNONYM_SCORE, WORDNET_SYNONYM_SIMILARITY,
+    WORDNET_HYPONYM_SCORE, WORDNET_HYPONYM_SIMILARITY,
+    WORDNET_HYPERNYM_SCORE, WORDNET_HYPERNYM_SIMILARITY,
+    get_constant,
 )
-from scorer_wordnet import is_concrete_noun
+from .scorer_wordnet import is_concrete_noun
 import nltk
 import re
 
@@ -74,40 +78,60 @@ def get_wordnet_relations(word, train_of_thought=[]):
     raw_words = []
     
     for synset in synsets:
-        synonyms = [lemma.name().replace('_', '') for lemma in synset.lemmas()][:5]
-        raw_words.extend(synonyms)
+        # Synonyms
+        synonyms = [
+            lemma.name().replace(
+                get_constant('WORD_SEPARATOR'), 
+                get_constant('WORD_SEPARATOR_REPLACEMENT')
+            ) for lemma in synset.lemmas()
+        ][:get_constant('MAX_SYNONYMS_PER_SYNSET')]
+        
+        # Hyponyms
+        hyponyms = [
+            h.lemmas()[0].name().replace(
+                get_constant('WORD_SEPARATOR'), 
+                get_constant('WORD_SEPARATOR_REPLACEMENT')
+            ) for h in synset.hyponyms()
+        ][:get_constant('MAX_HYPONYMS_PER_SYNSET')]
+        
+        # Hypernyms
+        hypernyms = [
+            h.lemmas()[0].name().replace(
+                get_constant('WORD_SEPARATOR'), 
+                get_constant('WORD_SEPARATOR_REPLACEMENT')
+            ) for h in synset.hypernyms()
+        ][:get_constant('MAX_HYPERNYMS_PER_SYNSET')]
+        
+        raw_words.extend(synonyms + hyponyms + hypernyms)
+        
         for w in synonyms:
             if w != word:
                 related_words.append({
                     'word': w,
                     'reason': f"is a synonym of {word}",
                     'relation_type': 'synonym',
-                    'score': 0.8,
-                    'similarity': 0.8,
+                    'score': WORDNET_SYNONYM_SCORE,
+                    'similarity': WORDNET_SYNONYM_SIMILARITY,
                     'source': 'wordnet'
                 })
         
-        hyponyms = [h.lemmas()[0].name().replace('_', '') for h in synset.hyponyms()][:20]
-        raw_words.extend(hyponyms)
         for w in hyponyms:
             related_words.append({
                 'word': w,
                 'reason': f"is a type of {word}",
                 'relation_type': 'hyponym',
-                'score': 0.7,
-                'similarity': 0.7,
+                'score': WORDNET_HYPONYM_SCORE,
+                'similarity': WORDNET_HYPONYM_SIMILARITY,
                 'source': 'wordnet'
             })
         
-        hypernyms = [h.lemmas()[0].name().replace('_', '') for h in synset.hypernyms()][:10]
-        raw_words.extend(hypernyms)
         for w in hypernyms:
             related_words.append({
                 'word': w,
                 'reason': f"is a more general category than {word}",
                 'relation_type': 'hypernym',
-                'score': 0.6,
-                'similarity': 0.6,
+                'score': WORDNET_HYPERNYM_SCORE,
+                'similarity': WORDNET_HYPERNYM_SIMILARITY,
                 'source': 'wordnet'
             })
     

@@ -1,6 +1,6 @@
-from utils_wordnet import get_wordnet_relations, is_valid_word, is_word_contained
-from utils_trained import get_trained_relations
-from config_constants import get_constant
+from .utils_wordnet import get_wordnet_relations, is_valid_word, is_word_contained
+from .utils_trained import get_trained_relations
+from .config_constants import get_constant
 
 def get_best_related_word(word, train_of_thought, game_state):
     active_model = get_constant('ACTIVE_MODEL')

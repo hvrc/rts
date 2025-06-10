@@ -1,0 +1,52 @@
+{
+    "EMPTY": {
+        "code": "EMPTY",
+        "message": "?",
+        "has_train": false
+    },
+    "RTS": {
+        "code": "RTS",
+        "message": "rts",
+        "has_train": false
+    },
+    "INVALID_WORD": {
+        "code": "INVALID_WORD",
+        "message": "doesn't count",
+        "has_train": false
+    },
+    "DUPLICATE": {
+        "code": "DUPLICATE",
+        "message": "we used {word} already",
+        "has_train": false
+    },
+    "SAME_WORD": {
+        "code": "SAME_WORD",
+        "message": "we just used {word}",
+        "has_train": false
+    },
+    "TOO_SIMILAR": {
+        "code": "TOO_SIMILAR",
+        "message": "isn't {word} too similar to {last_word}?",
+        "has_train": false
+    },
+    "UNRELATED": {
+        "code": "UNRELATED",
+        "message": "{suggestion}",
+        "has_train": true
+    },
+    "NO_RELATION": {
+        "code": "NO_RELATION",
+        "message": "new word pls?",
+        "has_train": false
+    },
+    "RESET": {
+        "code": "RESET",
+        "message": "alright, give me a word",
+        "has_train": false
+    },
+    "ERROR": {
+        "code": "ERROR",
+        "message": "?",
+        "has_train": false
+    }
+}
