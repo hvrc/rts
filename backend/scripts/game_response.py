@@ -6,7 +6,7 @@ from .utils_wordnet import (
 from .utils_common import get_best_related_word
 from .utils_trained import get_trained_relations, get_trained_similarity
 from .config_constants import RESPONSE_CONFIG, get_constant
-from .model_trainer import train_from_rating
+from .model_trainer import update_rating
 
 def print_rating_change(word1, word2, result):
     """Helper function to print rating changes consistently"""
@@ -60,7 +60,7 @@ def format_response(message, game_state):
                 best_related = get_best_related_word(message, train_of_thought, game_state)
                 if best_related:
                     # Train with low rating for unrelated words
-                    result = train_from_rating(last_bot_word, message, 0.4)  # 0.5 - 0.1 = 0.4
+                    result = update_rating(last_bot_word, message, -0.1) # 0.5 - 0.1 = 0.4
                     print_rating_change(last_bot_word, message, result)
                     
                     return format_response_with_code('UNRELATED', suggestion=best_related['word'], train_of_thought=train_of_thought)
@@ -70,7 +70,7 @@ def format_response(message, game_state):
         if best_related:
             # Train with medium rating for related words
             if last_bot_word:
-                result = train_from_rating(last_bot_word, message, 0.5)
+                result = update_rating(last_bot_word, message, 0.0)
                 print_rating_change(last_bot_word, message, result)
             
             return format_response_with_code('RELATED', suggestion=best_related['word'], train_of_thought=train_of_thought)

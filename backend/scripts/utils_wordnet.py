@@ -72,7 +72,11 @@ def get_word_definition(word):
         return definition.split(';')[0].strip()
     return None
 
-def get_wordnet_relations(word, train_of_thought=[]):
+def get_wordnet_relations(word, train_of_thought=[], excluded_words=None):
+    """Get WordNet relations, excluding words that are low-rated in trained data"""
+    if excluded_words is None:
+        excluded_words = set()
+    
     synsets = wordnet.synsets(word, pos=[wordnet.NOUN, wordnet.ADJ])
     related_words = []
     raw_words = []
@@ -104,8 +108,9 @@ def get_wordnet_relations(word, train_of_thought=[]):
         
         raw_words.extend(synonyms + hyponyms + hypernyms)
         
+        # Filter out excluded words for synonyms
         for w in synonyms:
-            if w != word:
+            if w != word and w.lower() not in excluded_words:
                 related_words.append({
                     'word': w,
                     'reason': f"is a synonym of {word}",
@@ -115,28 +120,37 @@ def get_wordnet_relations(word, train_of_thought=[]):
                     'source': 'wordnet'
                 })
         
+        # Filter out excluded words for hyponyms
         for w in hyponyms:
-            related_words.append({
-                'word': w,
-                'reason': f"is a type of {word}",
-                'relation_type': 'hyponym',
-                'score': WORDNET_HYPONYM_SCORE,
-                'similarity': WORDNET_HYPONYM_SIMILARITY,
-                'source': 'wordnet'
-            })
+            if w.lower() not in excluded_words:
+                related_words.append({
+                    'word': w,
+                    'reason': f"is a type of {word}",
+                    'relation_type': 'hyponym',
+                    'score': WORDNET_HYPONYM_SCORE,
+                    'similarity': WORDNET_HYPONYM_SIMILARITY,
+                    'source': 'wordnet'
+                })
         
+        # Filter out excluded words for hypernyms
         for w in hypernyms:
-            related_words.append({
-                'word': w,
-                'reason': f"is a more general category than {word}",
-                'relation_type': 'hypernym',
-                'score': WORDNET_HYPERNYM_SCORE,
-                'similarity': WORDNET_HYPERNYM_SIMILARITY,
-                'source': 'wordnet'
-            })
+            if w.lower() not in excluded_words:
+                related_words.append({
+                    'word': w,
+                    'reason': f"is a more general category than {word}",
+                    'relation_type': 'hypernym',
+                    'score': WORDNET_HYPERNYM_SCORE,
+                    'similarity': WORDNET_HYPERNYM_SIMILARITY,
+                    'source': 'wordnet'
+                })
     
     if raw_words and train_of_thought is not None:
-        train_of_thought.append(list(set(raw_words)))
+        # Show original raw words, then filtered words
+        original_count = len(set(raw_words))
+        filtered_words = [w for w in set(raw_words) if w.lower() not in excluded_words]
+        train_of_thought.append(filtered_words)
+        if excluded_words and original_count > len(filtered_words):
+            train_of_thought.append([f"Filtered out {original_count - len(filtered_words)} low-rated words"])
     
     return related_words
 

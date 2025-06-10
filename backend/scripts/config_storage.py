@@ -2,6 +2,9 @@ import os
 import pickle
 from datetime import datetime
 
+try: from .config_constants import get_constant
+except ImportError: from config_constants import get_constant
+
 class StorageManager:
     _instance = None
     
@@ -11,9 +14,7 @@ class StorageManager:
             cls._instance._initialize()
         return cls._instance
     
-    def _initialize(self, data_dir="model_rts_1"):
-        from .config_constants import get_constant
-        
+    def _initialize(self, data_dir="model_rts_1"):     
         # Use absolute path relative to the script directory
         script_dir = os.path.dirname(os.path.dirname(__file__))
         self.data_dir = os.path.join(script_dir, data_dir)
@@ -25,7 +26,6 @@ class StorageManager:
     
     def _initialize_default_data(self):
         """Set up default data structures"""
-        from .config_constants import get_constant
         
         self.save_word_pairs({})
         self.save_model_weights({
@@ -39,7 +39,7 @@ class StorageManager:
             'correct_predictions': 0,
             'total_predictions': 0
         })
-        
+
     def _get_file_path(self, name):
         file_path = os.path.join(self.data_dir, f"{name}.pkl")
         # Normalize path for Windows
