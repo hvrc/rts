@@ -6,8 +6,7 @@ from .utils_wordnet import (
 from .utils_common import get_best_related_word
 from .utils_trained import get_trained_relations, get_trained_similarity
 from .config_constants import RESPONSE_CONFIG, get_constant
-
-# scorer = CombinedScorer()  # Remove this line
+from .model_trainer import train_from_rating
 
 def format_response_with_code(code, **kwargs):
     response_type = RESPONSE_CONFIG[code]
@@ -60,14 +59,19 @@ def format_response(message, game_state):
                 best_related = get_best_related_word(message, train_of_thought, game_state)
                 if best_related:
                     game_state.add_word(best_related['word'])
-                    game_state.last_word = best_related['word']
+                    game_state.update_words(best_related['word'])  # Replace direct assignment
                     game_state.last_reason = best_related['reason']
                     game_state.last_similarity = best_related['similarity']
+                    
+                    train_from_rating(previous_word, message, 0.25)
+                    train_of_thought.append([f"Added positive association: {previous_word} -> {message}"])
+
                     return {
                         'response': f"{best_related['word']}", 
                         'train_of_thought': train_of_thought,
                         'response_code': 'UNRELATED'
                     }
+
                 return format_response_with_code('NO_RELATION')
         
         best_related = get_best_related_word(message, train_of_thought, game_state)
@@ -75,16 +79,23 @@ def format_response(message, game_state):
             game_state.word_history.remove(message)
             return format_response_with_code('NO_RELATION')
         
+        # If there was a previous bot word, train the model with it and the user's word
+        if game_state.last_word:
+            train_from_rating(game_state.last_word, message, 0.5)
+            train_of_thought.append([f"Added positive association: {game_state.last_word} -> {message}"])
+        
+        # Update game state with bot's new word
         game_state.add_word(best_related['word'])
-        game_state.last_word = best_related['word']
+        game_state.update_words(best_related['word'])  # Replace direct assignment
         game_state.last_reason = best_related['reason']
         game_state.last_similarity = best_related['similarity']
-        
+
         return {
             'response': best_related['word'],
             'train_of_thought': train_of_thought,
             'response_code': 'RELATED'
         }
+        
     except Exception as e:
         print(f"Error in format_response: {str(e)}")
         return format_response_with_code('ERROR')

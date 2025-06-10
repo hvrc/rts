@@ -7,6 +7,7 @@ interface Message {
   text: string;
   isUser: boolean;
   showQuestionMark?: boolean;
+  id?: string; // Add unique identifier for messages
 }
 
 interface WordState {
@@ -62,7 +63,12 @@ function Chat() {
     e.preventDefault();
     if (!inputText.trim()) return;
 
-    setMessages(prev => [...prev, { text: inputText, isUser: true }]);
+    const messageId = `msg_${Date.now()}`;
+    setMessages(prev => [...prev, { 
+      text: inputText, 
+      isUser: true,
+      id: messageId 
+    }]);
     const userInput = inputText;
     setInputText('');
     
@@ -115,6 +121,33 @@ function Chat() {
         text: "?", 
         isUser: false 
       }]);
+    }
+  };
+
+  const handleQuestionMarkClick = async (messageId: string) => {
+    try {
+      // Remove question mark locally
+      setMessages(prev => prev.map(msg => 
+        msg.id === messageId ? { ...msg, showQuestionMark: false } : msg
+      ));
+
+      // Notify backend
+      const response = await fetch(`${API_URL}/remove_question`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          message_id: messageId,
+          word: messages.find(m => m.id === messageId)?.text
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('Error removing question mark:', error);
     }
   };
 
@@ -517,7 +550,11 @@ function Chat() {
             >
               <div style={{ position: 'relative' }}>
                 {message.isUser && message.showQuestionMark && (
-                  <div className="question-mark-circle">
+                  <div 
+                    className="question-mark-circle"
+                    onClick={() => message.id && handleQuestionMarkClick(message.id)}
+                    style={{ cursor: 'pointer' }}
+                  >
                     ?
                   </div>
                 )}

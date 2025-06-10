@@ -16,6 +16,7 @@ class GameState:
     
     def reset(self):
         self.last_word = None
+        self.previous_word = None  # Add this line
         self.last_reason = None
         self.last_similarity = None
         self.word_history = set()   
@@ -27,3 +28,7 @@ class GameState:
             return False
         self.word_history.add(word)
         return True
+    
+    def update_words(self, new_word):
+        self.previous_word = self.last_word  # Store previous word
+        self.last_word = new_word

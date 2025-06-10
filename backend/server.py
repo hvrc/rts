@@ -3,6 +3,7 @@ from flask_cors import CORS
 from scripts.game_state import GameState
 from scripts.game_response import format_response
 from scripts.config_constants import initialize_constants, get_constant, update_constant
+from scripts.model_trainer import update_rating
 import os
 
 app = Flask(__name__)
@@ -18,8 +19,8 @@ CORS(app, resources={
     }
 })
 
-initialize_constants()  # Initialize all constants first
-update_constant('ACTIVE_MODEL', 'wordnet')
+initialize_constants()
+update_constant('ACTIVE_MODEL', 'trained_wordnet')
 game_state = GameState()
 
 @app.route('/')
@@ -54,6 +55,35 @@ def reset():
         'train_of_thought': response.get('train_of_thought', []),
         'response_code': response.get('response_code', '')
     })
+
+@app.route('/remove_question', methods=['POST'])
+def remove_question():
+    try:
+        data = request.json
+        message_id = data.get('message_id')
+        current_word = data.get('word')
+        
+        # Get the previous bot word from game state
+        previous_word = game_state.previous_word  # Use previous_word instead of last_word
+        
+        if previous_word and current_word:
+            # Update the rating to 1.0 since user accepted the relation
+            update_rating(previous_word, current_word, 1.0)
+            print(f"Updated pair rating to 1.0: {previous_word} -> {current_word}")
+        else:
+            print(f"Could not update rating - Missing words: previous={previous_word}, current={current_word}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Question mark removed and rating updated'
+        }), 200
+    
+    except Exception as e:
+        print(f"Error in remove_question: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
