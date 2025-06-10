@@ -85,5 +85,33 @@ def remove_question():
             'error': str(e)
         }), 500
 
+@app.route('/update_rating', methods=['POST'])
+def update_rating_route():
+    try:
+        data = request.json
+        message_id = data.get('message_id')
+        current_word = data.get('word')
+        rating = data.get('rating', 0.0)
+        
+        if game_state.current_pair:
+            # Use the stored pair instead of trying to figure it out
+            word1, word2 = game_state.current_pair
+            update_rating(word1, word2, rating)
+            print(f"Updated pair rating to {rating}: {word1} -> {word2}")
+        else:
+            print(f"Could not update rating - No current word pair available")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Rating updated'
+        }), 200
+    
+    except Exception as e:
+        print(f"Error in update_rating: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

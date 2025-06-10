@@ -7,7 +7,10 @@ interface Message {
   text: string;
   isUser: boolean;
   showQuestionMark?: boolean;
-  id?: string; // Add unique identifier for messages
+  id?: string;
+  liked?: boolean;
+  disliked?: boolean;
+  showRatingButtons?: boolean;
 }
 
 interface WordState {
@@ -85,6 +88,7 @@ function Chat() {
 
       const data: ServerResponse = await response.json();
 
+      // Update where bot messages are added in handleSubmit:
       if (data.response_code === 'UNRELATED') {
         setMessages(prev => {
           const newMessages = [...prev];
@@ -94,10 +98,18 @@ function Chat() {
               break;
             }
           }
-          return [...newMessages, { text: data.response, isUser: false }];
+          return [...newMessages, { 
+            text: data.response, 
+            isUser: false,
+            id: `bot_msg_${Date.now()}` // Add ID for bot message
+          }];
         });
       } else {
-        setMessages(prev => [...prev, { text: data.response, isUser: false }]);
+        setMessages(prev => [...prev, { 
+          text: data.response, 
+          isUser: false,
+          id: `bot_msg_${Date.now()}` // Add ID for bot message
+        }]);
       }
 
       if (showThoughtProcess && data.train_of_thought && data.train_of_thought.length > 0 && userInput !== lastProcessedMessage) {
@@ -151,6 +163,53 @@ function Chat() {
     }
   };
 
+  // Update the handleBotMessageClick function to only show rating buttons for clicked message
+  const handleBotMessageClick = (messageId: string) => {
+    setMessages(prev => prev.map(msg => ({
+      ...msg,
+      // Only show rating buttons for clicked message, hide for others
+      showRatingButtons: msg.id === messageId ? true : false
+    })));
+  };
+
+  // Update the handleRatingClick function to only update the clicked message
+  const handleRatingClick = async (messageId: string, isLike: boolean) => {
+    try {
+      // Update UI first
+      setMessages(prev => prev.map(msg => 
+        msg.id === messageId ? {
+          ...msg,
+          liked: isLike,
+          disliked: !isLike,
+          showRatingButtons: false
+        } : msg
+      ));
+
+      // Get the current message
+      const currentMessage = messages.find(m => m.id === messageId);
+      if (!currentMessage) return;
+
+      // Send rating to backend
+      const response = await fetch(`${API_URL}/update_rating`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          message_id: messageId,
+          word: currentMessage.text,
+          rating: isLike ? 1.0 : 0.0
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('Error updating rating:', error);
+    }
+  };
+
   useEffect(() => {
     let mounted = true;
     
@@ -168,10 +227,15 @@ function Chat() {
         'u start...',
       ];
       
+      // Also update the welcome messages in initializeChat:
       for (const message of welcomeMessages) {
         if (!mounted) break;
         
-        setMessages(prev => [...prev, { text: "", isUser: false }]);
+        setMessages(prev => [...prev, { 
+          text: "", 
+          isUser: false,
+          id: `bot_msg_${Date.now()}` // Add ID for welcome messages
+        }]);
         
         setIsTextAnimating(true);
         setAnimatedText("");
@@ -540,24 +604,32 @@ function Chat() {
           )}
           {messages.map((message, index) => (
             <div
-              key={index}
+              key={message.id || index}
               ref={!message.isUser && index === messages.length - 1 ? latestBotMessageRef : null}
               style={{
                 display: 'flex',
                 justifyContent: message.isUser ? 'flex-end' : 'flex-start',
-                marginBottom: '10px'
+                marginBottom: '10px',
+                position: 'relative',
+                cursor: !message.isUser ? 'pointer' : 'default'
               }}
+              onClick={() => !message.isUser && message.id && handleBotMessageClick(message.id)}
             >
               <div style={{ position: 'relative' }}>
+                {/* Question mark for user messages */}
                 {message.isUser && message.showQuestionMark && (
                   <div 
                     className="question-mark-circle"
-                    onClick={() => message.id && handleQuestionMarkClick(message.id)}
-                    style={{ cursor: 'pointer' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      message.id && handleQuestionMarkClick(message.id);
+                    }}
                   >
                     ?
                   </div>
                 )}
+
+                {/* Message bubble */}
                 <div style={{
                   maxWidth: '100%',
                   padding: '8px 12px',
@@ -581,6 +653,30 @@ function Chat() {
                     message.text
                   )}
                 </div>
+
+                {/* Rating circles for bot messages */}
+                {!message.isUser && (message.showRatingButtons || message.liked || message.disliked) && (
+                  <>
+                    {(message.showRatingButtons || message.liked) && (
+                      <div 
+                        className={`rating-circle like-circle ${message.liked ? 'selected' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          message.id && handleRatingClick(message.id, true);
+                        }}
+                      />
+                    )}
+                    {(message.showRatingButtons || message.disliked) && (
+                      <div 
+                        className={`rating-circle dislike-circle ${message.disliked ? 'selected' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          message.id && handleRatingClick(message.id, false);
+                        }}
+                      />
+                    )}
+                  </>
+                )}
               </div>
             </div>
           ))}

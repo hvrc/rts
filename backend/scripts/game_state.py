@@ -16,10 +16,13 @@ class GameState:
     
     def reset(self):
         self.last_word = None
-        self.previous_word = None  # Add this line
+        self.previous_word = None
+        self.current_pair = None
+        self.last_bot_word = None  # Add this to track bot's words
+        self.last_user_word = None  # Add this to track user's words
         self.last_reason = None
         self.last_similarity = None
-        self.word_history = set()   
+        self.word_history = set()
         self.player_similarity_threshold = PLAYER_THRESHOLD
     
     def add_word(self, word):
@@ -29,6 +32,16 @@ class GameState:
         self.word_history.add(word)
         return True
     
-    def update_words(self, new_word):
-        self.previous_word = self.last_word  # Store previous word
-        self.last_word = new_word
+    def update_words(self, new_word, is_bot=True):
+        """
+        Update word tracking with clear user/bot distinction
+        """
+        if is_bot:
+            self.previous_word = self.last_bot_word
+            self.last_bot_word = new_word
+            if self.last_user_word:  # If we have both user and bot words
+                self.current_pair = (self.last_bot_word, self.last_user_word)
+        else:
+            self.last_user_word = new_word
+            if self.last_bot_word:  # If we have both user and bot words
+                self.current_pair = (self.last_bot_word, new_word)

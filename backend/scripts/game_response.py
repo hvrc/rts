@@ -74,27 +74,55 @@ def format_response(message, game_state):
 
                 return format_response_with_code('NO_RELATION')
         
+        # Update user's word
+        game_state.update_words(message, is_bot=False)
+        
+        if game_state.last_bot_word:
+            # Check relation with last bot word
+            is_related, similarity = get_wordnet_similarity(message, game_state.last_bot_word)
+            
+            if similarity < game_state.player_similarity_threshold:
+                best_related = get_best_related_word(message, train_of_thought, game_state)
+                if best_related:
+                    # Update bot's word
+                    game_state.update_words(best_related['word'], is_bot=True)
+                    game_state.last_reason = best_related['reason']
+                    game_state.last_similarity = best_related['similarity']
+                    
+                    # Train with low rating for unrelated words
+                    if game_state.current_pair:
+                        train_from_rating(game_state.current_pair[0], game_state.current_pair[1], 0.25)
+                        train_of_thought.append([f"Added low rating for unrelated words: {game_state.current_pair[0]} -> {game_state.current_pair[1]}"])
+                    
+                    return {
+                        'response': best_related['word'],
+                        'train_of_thought': train_of_thought,
+                        'response_code': 'UNRELATED'
+                    }
+                
+                return format_response_with_code('NO_RELATION')
+        
+        # Handle normal case
         best_related = get_best_related_word(message, train_of_thought, game_state)
-        if not best_related:
-            game_state.word_history.remove(message)
-            return format_response_with_code('NO_RELATION')
+        if best_related:
+            # Update bot's word
+            game_state.update_words(best_related['word'], is_bot=True)
+            game_state.last_reason = best_related['reason']
+            game_state.last_similarity = best_related['similarity']
+            
+            # Train with medium rating for related words
+            if game_state.current_pair:
+                train_from_rating(game_state.current_pair[0], game_state.current_pair[1], 0.5)
+                train_of_thought.append([f"Added medium rating for related words: {game_state.current_pair[0]} -> {game_state.current_pair[1]}"])
+            
+            return {
+                'response': best_related['word'],
+                'train_of_thought': train_of_thought,
+                'response_code': 'RELATED'
+            }
         
-        # If there was a previous bot word, train the model with it and the user's word
-        if game_state.last_word:
-            train_from_rating(game_state.last_word, message, 0.5)
-            train_of_thought.append([f"Added positive association: {game_state.last_word} -> {message}"])
-        
-        # Update game state with bot's new word
-        game_state.add_word(best_related['word'])
-        game_state.update_words(best_related['word'])  # Replace direct assignment
-        game_state.last_reason = best_related['reason']
-        game_state.last_similarity = best_related['similarity']
-
-        return {
-            'response': best_related['word'],
-            'train_of_thought': train_of_thought,
-            'response_code': 'RELATED'
-        }
+        game_state.word_history.remove(message)
+        return format_response_with_code('NO_RELATION')
         
     except Exception as e:
         print(f"Error in format_response: {str(e)}")
