@@ -1,8 +1,8 @@
-x user rating training
-x sentence based training
-
+user rating training
+sentence based training
 better model storing
 
+implement machine learning model
 spellcheck
 pre exisintg scoring libraries
 definition
@@ -16,5 +16,4 @@ dark mode, only rts
 selectable letters
 
 apply learned data
-
 mean weight for each pair of words based on how often people connect them
