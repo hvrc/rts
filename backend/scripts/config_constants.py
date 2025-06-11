@@ -3,7 +3,6 @@ import json
 from datetime import datetime
 
 def load_json_config(filename):
-    """Load a JSON configuration file from the config directory"""
     config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', filename)
     try:
         with open(config_path, 'r') as f:
@@ -12,31 +11,24 @@ def load_json_config(filename):
     except Exception as e:
         return {}
 
-# Load configurations from JSON files
 MODEL_WEIGHTS = load_json_config('model_weights.json')
 CONSTANTS = load_json_config('constants.json')
 RESPONSE_CONFIG = load_json_config('responses.json')
-
-# Combine all constants
 ALL_CONSTANTS = {**CONSTANTS, **MODEL_WEIGHTS}
 
-# In-memory storage for runtime constants
 _runtime_constants = {}
 
 def initialize_constants():
-    """Initialize constants in runtime storage"""
     global _runtime_constants
     _runtime_constants = ALL_CONSTANTS.copy()
 
 def get_constant(name):
-    """Get constant from runtime storage with fallback to defaults"""
     global _runtime_constants
     if not _runtime_constants:
         initialize_constants()
     return _runtime_constants.get(name, ALL_CONSTANTS.get(name))
 
 def update_constant(name, value):
-    """Update constant in runtime storage"""
     global _runtime_constants
     try:
         if not _runtime_constants:
@@ -46,10 +38,8 @@ def update_constant(name, value):
     except Exception as e:
         return False
 
-# Initialize constants on module load
 initialize_constants()
 
-# Export commonly used constants for convenience
 PLAYER_THRESHOLD = get_constant('PLAYER_THRESHOLD')
 AI_THRESHOLD = get_constant('AI_THRESHOLD')
 SISTER_TERM_THRESHOLD = get_constant('SISTER_TERM_THRESHOLD')
@@ -74,7 +64,6 @@ WORDNET_FREQUENCY_WEIGHT = get_constant('WORDNET_FREQUENCY_WEIGHT')
 WORDNET_CONCRETE_WEIGHT = get_constant('WORDNET_CONCRETE_WEIGHT')
 ENFORCE_RTS_RULE = get_constant('ENFORCE_RTS_RULE')
 
-# New relation weights
 WORDNET_SYNONYM_SCORE = get_constant('WORDNET_SYNONYM_SCORE')
 WORDNET_SYNONYM_SIMILARITY = get_constant('WORDNET_SYNONYM_SIMILARITY')
 WORDNET_HYPONYM_SCORE = get_constant('WORDNET_HYPONYM_SCORE')

@@ -9,22 +9,6 @@ class TrainableScorer:
     
     def _load_or_create_weights(self):
         weights = self.storage.load_model_weights()
-
-        # keep this commented as is
-        
-        # if not weights:
-        #     weights = {
-        #         'wordnet_base': 0.6,
-        #         'user_feedback': 0.2,
-        #         'sentence_context': 0.2,
-        #         'learning_rate': 0.01,
-        #         'active': True,
-        #         'created_at': datetime.now(),
-        #         'training_iterations': 0,
-        #         'correct_predictions': 0,
-        #         'total_predictions': 0
-        #     }
-        #     self.storage.save_model_weights(weights)
         return weights
 
     def get_learned_score(self, word1, word2):
@@ -56,11 +40,9 @@ class TrainableScorer:
             self.weights['user_feedback'] *= (1 - self.weights['learning_rate'])
             self.weights['sentence_context'] *= (1 - self.weights['learning_rate'])
         
-        # Remove bert_base from normalization
         total = sum(w for k, w in self.weights.items() 
                     if k in ['wordnet_base', 'user_feedback', 'sentence_context'])
         
-        # Normalize remaining weights
         for key in ['wordnet_base', 'user_feedback', 'sentence_context']:
             self.weights[key] /= total
         

@@ -33,11 +33,10 @@ def echo():
     try:
         data = request.json
         message = data.get('message', '')
-        
-        # Process response first to validate the word
+          # process response first to validate the word
         response = format_response(message, game_state)
         
-        # Only add user's word to history if it's valid (not an error response)
+        # only add user's word to history if it's valid (not an error response)
         user_word_valid = response.get('response_code') not in [
             'INVALID_WORD', 'DUPLICATE', 'ERROR', 'EMPTY', 'RTS', 'SAME_WORD', 'TOO_SIMILAR'
         ]
@@ -45,12 +44,12 @@ def echo():
         if user_word_valid:
             game_state.add_word(message, 'user')
         
-        # Only add bot's response to history if it should be trained (has_train=true)
+        # only add bot's response to history if it should be trained (has_train=true)
         response_config = RESPONSE_CONFIG.get(response.get('response_code', ''), {})
         should_add_bot_response = response_config.get('has_train', False)
         
         if should_add_bot_response and response.get('response'):
-            # For UNRELATED responses, the actual word is in the response
+            # for unrelated responses, the actual word is in the response
             bot_word = response['response']
             game_state.add_word(bot_word, 'bot')
         
@@ -82,10 +81,9 @@ def remove_question():
     try:
         data = request.json
         current_word = data.get('word')
-        
-        # Find the word entry and get its pair
+          # find the word entry and get its pair
         context = game_state.find_word_context(current_word)
-        if context and context['previous_word']:            # Add 0.2 to rating when question mark is removed
+        if context and context['previous_word']:            # add 0.2 to rating when question mark is removed
             rating_change = 0.2
             result = update_rating(context['previous_word'], current_word, rating_change)
             if result:
@@ -109,10 +107,9 @@ def update_rating_route():
         data = request.json
         current_word = data.get('word')
         is_like = data.get('rating', 0.0) == 1.0
-        
-        # Find the word entry and get its pair
+          # find the word entry and get its pair
         context = game_state.find_word_context(current_word)
-        if context and context['previous_word']:            # Add 0.1 for like, subtract 0.1 for dislike
+        if context and context['previous_word']:            # add 0.1 for like, subtract 0.1 for dislike
             rating_change = 0.1 if is_like else -0.1
             result = update_rating(context['previous_word'], current_word, rating_change)
             if result:
@@ -132,7 +129,7 @@ def update_rating_route():
 
 @app.route('/debug/history', methods=['GET'])
 def debug_history():
-    """Debug endpoint to view conversation history"""
+    # debug endpoint to view conversation history
     try:
         history = game_state.get_conversation_history()
         return jsonify({

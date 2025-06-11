@@ -15,18 +15,14 @@ class StorageManager:
         return cls._instance
     
     def _initialize(self, data_dir="model_rts_1"):     
-        # Use absolute path relative to the script directory
         script_dir = os.path.dirname(os.path.dirname(__file__))
         self.data_dir = os.path.join(script_dir, data_dir)
         
-        # Initialize storage directory
         if not os.path.exists(self.data_dir):
             os.makedirs(self.data_dir, exist_ok=True)
             self._initialize_default_data()
     
-    def _initialize_default_data(self):
-        """Set up default data structures"""
-        
+    def _initialize_default_data(self):        
         self.save_word_pairs({})
         self.save_model_weights({
             'wordnet_base': get_constant('INITIAL_WORDNET_BASE'),
@@ -42,7 +38,6 @@ class StorageManager:
 
     def _get_file_path(self, name):
         file_path = os.path.join(self.data_dir, f"{name}.pkl")
-        # Normalize path for Windows
         return os.path.normpath(file_path)
 
     def _load_data(self, name):
@@ -58,12 +53,11 @@ class StorageManager:
     def _save_data(self, name, data):
         try:
             file_path = self._get_file_path(name)
-            
-            # Ensure directory exists
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             
             with open(file_path, 'wb') as f:
                 pickle.dump(data, f)
+                
         except Exception as e:
             raise
     

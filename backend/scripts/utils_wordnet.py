@@ -19,6 +19,7 @@ def is_valid_word(word):
         return False, "invalid input"
     
     cleaned = re.sub(r'[^a-zA-Z]', '', word)
+
     if not cleaned:
         return False, "no letters"
     
@@ -55,10 +56,12 @@ def get_wordnet_similarity(word1, word2):
 
 def get_contextual_definition(word):
     synsets = wordnet.synsets(word)
+
     if not synsets:
         return None
     
     noun_synsets = [s for s in synsets if s.pos() == wordnet.NOUN]
+
     if noun_synsets:
         synset = noun_synsets[0]
     else:
@@ -73,7 +76,6 @@ def get_word_definition(word):
     return None
 
 def get_wordnet_relations(word, train_of_thought=[], excluded_words=None):
-    """Get WordNet relations, excluding words that are low-rated in trained data"""
     if excluded_words is None:
         excluded_words = set()
     
@@ -82,7 +84,6 @@ def get_wordnet_relations(word, train_of_thought=[], excluded_words=None):
     raw_words = []
     
     for synset in synsets:
-        # Synonyms
         synonyms = [
             lemma.name().replace(
                 get_constant('WORD_SEPARATOR'), 
@@ -90,7 +91,6 @@ def get_wordnet_relations(word, train_of_thought=[], excluded_words=None):
             ) for lemma in synset.lemmas()
         ][:get_constant('MAX_SYNONYMS_PER_SYNSET')]
         
-        # Hyponyms
         hyponyms = [
             h.lemmas()[0].name().replace(
                 get_constant('WORD_SEPARATOR'), 
@@ -98,7 +98,6 @@ def get_wordnet_relations(word, train_of_thought=[], excluded_words=None):
             ) for h in synset.hyponyms()
         ][:get_constant('MAX_HYPONYMS_PER_SYNSET')]
         
-        # Hypernyms
         hypernyms = [
             h.lemmas()[0].name().replace(
                 get_constant('WORD_SEPARATOR'), 
@@ -107,8 +106,7 @@ def get_wordnet_relations(word, train_of_thought=[], excluded_words=None):
         ][:get_constant('MAX_HYPERNYMS_PER_SYNSET')]
         
         raw_words.extend(synonyms + hyponyms + hypernyms)
-        
-        # Filter out excluded words for synonyms
+
         for w in synonyms:
             if w != word and w.lower() not in excluded_words:
                 related_words.append({
@@ -119,8 +117,7 @@ def get_wordnet_relations(word, train_of_thought=[], excluded_words=None):
                     'similarity': WORDNET_SYNONYM_SIMILARITY,
                     'source': 'wordnet'
                 })
-        
-        # Filter out excluded words for hyponyms
+
         for w in hyponyms:
             if w.lower() not in excluded_words:
                 related_words.append({
@@ -132,7 +129,6 @@ def get_wordnet_relations(word, train_of_thought=[], excluded_words=None):
                     'source': 'wordnet'
                 })
         
-        # Filter out excluded words for hypernyms
         for w in hypernyms:
             if w.lower() not in excluded_words:
                 related_words.append({
@@ -145,10 +141,10 @@ def get_wordnet_relations(word, train_of_thought=[], excluded_words=None):
                 })
     
     if raw_words and train_of_thought is not None:
-        # Show original raw words, then filtered words
         original_count = len(set(raw_words))
         filtered_words = [w for w in set(raw_words) if w.lower() not in excluded_words]
         train_of_thought.append(filtered_words)
+        
         if excluded_words and original_count > len(filtered_words):
             train_of_thought.append([f"Filtered out {original_count - len(filtered_words)} low-rated words"])
     

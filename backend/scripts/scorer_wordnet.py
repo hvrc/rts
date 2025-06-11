@@ -28,6 +28,7 @@ def is_concrete_noun(word):
             return True
         if is_concrete_by_hypernyms(synset):
             return True
+
     return False
 
 class WordNetScorer:
@@ -59,10 +60,8 @@ class WordNetScorer:
             score += self.hypernym_weight
         elif relation_type == 'sister':
             score += self.sister_weight
-        
         if word.lower() in COMMON_WORDS:
             score += self.frequency_weight
-        
         if is_concrete_noun(word):
             score += self.concrete_weight
         

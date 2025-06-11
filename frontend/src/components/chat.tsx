@@ -85,10 +85,8 @@ function Chat() {
       });
 
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
       const data: ServerResponse = await response.json();
 
-      // Update where bot messages are added in handleSubmit:
       if (data.response_code === 'UNRELATED') {
         setMessages(prev => {
           const newMessages = [...prev];
@@ -101,14 +99,14 @@ function Chat() {
           return [...newMessages, { 
             text: data.response, 
             isUser: false,
-            id: `bot_msg_${Date.now()}` // Add ID for bot message
+            id: `bot_msg_${Date.now()}`
           }];
         });
       } else {
         setMessages(prev => [...prev, { 
           text: data.response, 
           isUser: false,
-          id: `bot_msg_${Date.now()}` // Add ID for bot message
+          id: `bot_msg_${Date.now()}`
         }]);
       }
 
@@ -138,12 +136,10 @@ function Chat() {
 
   const handleQuestionMarkClick = async (messageId: string) => {
     try {
-      // Remove question mark locally
       setMessages(prev => prev.map(msg => 
         msg.id === messageId ? { ...msg, showQuestionMark: false } : msg
       ));
 
-      // Notify backend
       const response = await fetch(`${API_URL}/remove_question`, {
         method: 'POST',
         headers: {
@@ -163,19 +159,15 @@ function Chat() {
     }
   };
 
-  // Update the handleBotMessageClick function to only show rating buttons for clicked message
   const handleBotMessageClick = (messageId: string) => {
     setMessages(prev => prev.map(msg => ({
       ...msg,
-      // Only show rating buttons for clicked message, hide for others
       showRatingButtons: msg.id === messageId ? true : false
     })));
   };
 
-  // Update the handleRatingClick function to only update the clicked message
   const handleRatingClick = async (messageId: string, isLike: boolean) => {
     try {
-      // Update UI first
       setMessages(prev => prev.map(msg => 
         msg.id === messageId ? {
           ...msg,
@@ -185,11 +177,9 @@ function Chat() {
         } : msg
       ));
 
-      // Get the current message
       const currentMessage = messages.find(m => m.id === messageId);
       if (!currentMessage) return;
 
-      // Send rating to backend
       const response = await fetch(`${API_URL}/update_rating`, {
         method: 'POST',
         headers: {
@@ -227,14 +217,13 @@ function Chat() {
         'u start...',
       ];
       
-      // Also update the welcome messages in initializeChat:
       for (const message of welcomeMessages) {
         if (!mounted) break;
         
         setMessages(prev => [...prev, { 
           text: "", 
           isUser: false,
-          id: `bot_msg_${Date.now()}` // Add ID for welcome messages
+          id: `bot_msg_${Date.now()}`
         }]);
         
         setIsTextAnimating(true);
@@ -390,7 +379,7 @@ function Chat() {
       display: 'flex',
       gap: '8px',
       alignItems: 'center',
-      marginRight: '45px',
+      marginRight: '12px',
       marginTop: '10px'
     };
 
@@ -433,18 +422,65 @@ function Chat() {
         darkModeButtonRef.current.style.backgroundColor = isDarkMode ? '#CCCCFF' : '#E9E9EB';
       }
     }, [showThoughtProcess, isDarkMode]);
-
     return (
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
         width: '100%',
-        padding: '4px 10px 16px 30px'
+        padding: '4px 10px 16px 30px',
+        position: 'relative'
       }}>
-        <Logo />
+        <div style={{ position: 'relative' }}>
+          <Logo />
+          <div className="instructions">
+            click the button in the top right to view the model's train of thought. you can rate the bot's responses by tapping its messages, to help train the model.
+          </div>
+        </div>
         <div style={buttonContainerStyle}>
-          {/* Train of Thought button */}
+
+          {/* dark mode button (right) */}
+          {/* <div style={{ position: 'relative' }}>
+            <div
+              ref={darkModeButtonRef}
+              style={{
+                ...buttonStyle,
+                backgroundColor: isDarkMode ? '#CCCCFF' : '#E9E9EB'
+              }}
+            >
+              <input
+                type="checkbox"
+                id="darkModeToggle"
+                style={{
+                  opacity: 0,
+                  position: 'absolute',
+                  width: '100%',
+                  height: '100%',
+                  margin: 0,
+                  cursor: 'pointer'
+                }}
+                checked={isDarkMode}
+                onChange={(e) => {
+                  // setIsDarkMode(e.currentTarget.checked);
+                }}
+                onMouseOver={(e) => {
+                  const container = e.currentTarget.parentElement;
+                  if (container && !isDarkMode) {
+                    container.style.backgroundColor = '#D3D3D3';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  const container = e.currentTarget.parentElement;
+                  if (container && !isDarkMode) {
+                    container.style.backgroundColor = '#E9E9EB';
+                  }
+                }}
+              />
+              <label htmlFor="darkModeToggle" style={labelStyle} title="Dark Mode"></label>
+            </div>
+          </div> */}
+          
+          {/* train of thought button */}
           <div style={{ position: 'relative' }}>
             <div
               ref={trainOfThoughtButtonRef}
@@ -484,47 +520,6 @@ function Chat() {
               <label htmlFor="trainOfThoughtToggle" style={labelStyle} title="Train of Thought"></label>
             </div>
           </div>
-
-          {/* Dark Mode button (right) */}
-          {/* <div style={{ position: 'relative' }}>
-            <div
-              ref={darkModeButtonRef}
-              style={{
-                ...buttonStyle,
-                backgroundColor: isDarkMode ? '#CCCCFF' : '#E9E9EB'
-              }}
-            >
-              <input
-                type="checkbox"
-                id="darkModeToggle"
-                style={{
-                  opacity: 0,
-                  position: 'absolute',
-                  width: '100%',
-                  height: '100%',
-                  margin: 0,
-                  cursor: 'pointer'
-                }}
-                checked={isDarkMode}
-                onChange={(e) => {
-                  setIsDarkMode(e.currentTarget.checked);
-                }}
-                onMouseOver={(e) => {
-                  const container = e.currentTarget.parentElement;
-                  if (container && !isDarkMode) {
-                    container.style.backgroundColor = '#D3D3D3';
-                  }
-                }}
-                onMouseOut={(e) => {
-                  const container = e.currentTarget.parentElement;
-                  if (container && !isDarkMode) {
-                    container.style.backgroundColor = '#E9E9EB';
-                  }
-                }}
-              />
-              <label htmlFor="darkModeToggle" style={labelStyle} title="Dark Mode"></label>
-            </div>
-          </div> */}
         </div>
       </div>
     );
@@ -559,7 +554,8 @@ function Chat() {
             overflowY: 'scroll',
             WebkitOverflowScrolling: 'touch',
             msOverflowStyle: 'none',
-            scrollbarWidth: 'none'
+            scrollbarWidth: 'none',
+            position: 'relative'
           }}
         >
           {isAnimating && showThoughtProcess && (
@@ -616,7 +612,7 @@ function Chat() {
               onClick={() => !message.isUser && message.id && handleBotMessageClick(message.id)}
             >
               <div style={{ position: 'relative' }}>
-                {/* Question mark for user messages */}
+                {/* question mark for user messages */}
                 {message.isUser && message.showQuestionMark && (
                   <div 
                     className="question-mark-circle"
@@ -629,7 +625,7 @@ function Chat() {
                   </div>
                 )}
 
-                {/* Message bubble */}
+                {/* message bubble */}
                 <div style={{
                   maxWidth: '100%',
                   padding: '8px 12px',
@@ -654,7 +650,7 @@ function Chat() {
                   )}
                 </div>
 
-                {/* Rating circles for bot messages */}
+                {/* rating circles for bot messages */}
                 {!message.isUser && (message.showRatingButtons || message.liked || message.disliked) && (
                   <>
                     {(message.showRatingButtons || message.liked) && (
@@ -687,7 +683,7 @@ function Chat() {
           style={{
             display: 'flex',
             gap: '8px',
-            padding: '10px',
+            padding: '10px 15px',
             position: 'relative',
             zIndex: 3,
             backgroundColor: '#fff'

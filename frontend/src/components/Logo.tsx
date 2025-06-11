@@ -20,7 +20,8 @@ const Logo = () => {
     display: 'flex',
     justifyContent: 'center',
     width: '100%',
-    padding: '8px 0 16px 0'
+    padding: '8px 0 16px 0',
+    marginLeft: '30px'
   };
 
   return (
