@@ -19,10 +19,27 @@ def visualize_word_pairs():
         print(f"Word Pair: {data['word1']} - {data['word2']}")
         print(f"Created: {format_timestamp(data['created_at'])}")
         
+        # Show current total score
+        total_score = data.get('total_score', 0.5)
+        print(f"Current Score: {total_score}")
+        
         if data['ratings']:
-            print("\nRatings:")
+            print("\nRating History:")
             for rating in data['ratings']:
-                print(f"  • {rating['rating']} ({format_timestamp(rating['timestamp'])})")
+                # Handle both old and new rating formats
+                if 'rating' in rating:
+                    # Old format
+                    print(f"  • {rating['rating']} ({format_timestamp(rating['timestamp'])})")
+                elif 'rating_change' in rating:
+                    # New incremental format
+                    change = rating['rating_change']
+                    prev_score = rating.get('previous_score', 'N/A')
+                    new_score = rating.get('new_score', 'N/A')
+                    change_text = f"+{change}" if change >= 0 else str(change)
+                    print(f"  • {change_text} (from {prev_score} to {new_score}) ({format_timestamp(rating['timestamp'])})")
+                else:
+                    # Unknown format
+                    print(f"  • Unknown rating format: {rating}")
         
         if data['sentences']:
             print("\nTraining Sentences:")
