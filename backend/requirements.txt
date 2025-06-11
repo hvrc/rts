@@ -1,0 +1,16 @@
+blinker
+click
+colorama
+Flask
+flask-cors
+gunicorn
+itsdangerous
+Jinja2
+joblib
+MarkupSafe
+nltk
+numpy
+packaging
+regex
+tqdm
+Werkzeug
