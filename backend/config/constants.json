@@ -26,6 +26,6 @@
     "CONCRETE_INDICATORS": [
         "object", "thing", "item", "entity", "physical", "material", "substance",
         "structure", "device", "tool", "container", "animal", "plant", "machine"
-    ],    "ENFORCE_RTS_RULE": false,
+    ],    "ENFORCE_RTS_RULE": true,
     "ACTIVE_MODEL": "trained_wordnet"
 }

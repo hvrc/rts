@@ -83,7 +83,8 @@ def remove_question():
         current_word = data.get('word')
           # find the word entry and get its pair
         context = game_state.find_word_context(current_word)
-        if context and context['previous_word']:            # add 0.2 to rating when question mark is removed
+        if context and context['previous_word']:
+            # add 0.2 to rating when question mark is removed
             rating_change = 0.2
             result = update_rating(context['previous_word'], current_word, rating_change)
             if result:
@@ -109,7 +110,8 @@ def update_rating_route():
         is_like = data.get('rating', 0.0) == 1.0
           # find the word entry and get its pair
         context = game_state.find_word_context(current_word)
-        if context and context['previous_word']:            # add 0.1 for like, subtract 0.1 for dislike
+        if context and context['previous_word']:
+            # add 0.1 for like, subtract 0.1 for dislike
             rating_change = 0.1 if is_like else -0.1
             result = update_rating(context['previous_word'], current_word, rating_change)
             if result:
