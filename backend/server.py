@@ -1,49 +1,49 @@
+"""RTS backend — thin Flask layer over engine.py.
+
+Endpoints match the frozen frontend contract exactly:
+  POST /echo  {"message": str}  -> {response, train_of_thought, response_code}
+  POST /reset                   -> {response, train_of_thought}
+"""
+
+import os
+
+from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from main import format_response, game_state
-import os
+
+load_dotenv()  # pull ANTHROPIC_API_KEY (and anything else) from backend/.env
+
+import engine  # noqa: E402  (import after load_dotenv so the client sees the key)
 
 app = Flask(__name__)
 
-CORS(app, resources={
-    r"/*": {
-        "origins": ["https://rts0-462101.ue.r.appspot.com", "http://localhost:5173"],
-        "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type"]
-    }
-})
+# Prod origin + any localhost port (Vite may land on 5173/5174/...).
+CORS(app, resources={r"/*": {
+    "origins": ["https://rts0-462101.ue.r.appspot.com",
+                r"http://localhost:\d+",
+                r"http://127\.0\.0\.1:\d+"],
+    "methods": ["GET", "POST", "OPTIONS"],
+    "allow_headers": ["Content-Type"],
+}})
 
-@app.route('/')
+
+@app.route("/")
 def home():
-    game_state.reset()
     return "welcome to the rts brain!"
 
-@app.route('/echo', methods=['POST'])
+
+@app.route("/echo", methods=["POST"])
 def echo():
-    try:
-        data = request.json
-        message = data.get('message', '')
-        response = format_response(message)
-        return jsonify({
-            'response': response['response'],
-            'train_of_thought': response.get('train_of_thought', []),
-            'response_code': response.get('response_code', '')
-        }), 200
-    except Exception as e:
-        return jsonify({
-            'response': 'Error processing request',
-            'train_of_thought': [],
-            'response_code': 'ERROR',
-            'error': str(e)
-        }), 500
+    data = request.get_json(silent=True) or {}
+    message = data.get("message", "")
+    return jsonify(engine.play(message)), 200
 
-@app.route('/reset', methods=['POST'])
+
+@app.route("/reset", methods=["POST"])
 def reset():
-    response = format_response('reset')
-    return jsonify({
-        'response': response['response'],
-        'train_of_thought': []
-    })
+    return jsonify(engine.reset()), 200
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", "5000"))
+    app.run(host="0.0.0.0", port=port, debug=True)
