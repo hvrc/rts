@@ -63,6 +63,20 @@ def play(player_input, game_id=SOLO_ID, reverse=False, preferences=None):
     code = data.get("response_code", "INVALID")
     reply = (data.get("response") or "").strip()
 
+    # A bare word is ALWAYS a move. The model sometimes mislabels the opening word of a
+    # fresh chain as a request to start over — which would wipe the board and replay the
+    # human's own word back as the AI's opener, swallowing their move. Asking to restart
+    # takes a sentence; one word never does.
+    if code == "RESTART" and rules.is_single_word(text):
+        try:
+            data = _ask(game, text, taste=taste, spent=spent,
+                        correction="that was a plain word — it is a MOVE, not a request "
+                                   "to start over. Do not use RESTART.")
+        except Exception as e:
+            return contract.error(e)
+        code = data.get("response_code", "INVALID")
+        reply = (data.get("response") or "").strip()
+
     # --- the human asked to start over, or asked the AI to open ---
     if code == "RESTART":
         return _restart(game_id, rule, data, reply)
