@@ -17,6 +17,9 @@ interface Message {
   // the new game, so the divider goes above it.
   newGameAfter?: boolean;
   newGameBefore?: boolean;
+
+  // An empty bot bubble holding the bot's place while it thinks. Renders as the dots.
+  pending?: boolean;
 }
 
 interface WordState {
@@ -124,11 +127,43 @@ function Chat() {
     setShowThoughtProcess(prev => !prev);
   }, []);
 
+  /**
+   * Swap the waiting bubble for the real reply. The placeholder is the one message in
+   * flight, so land on it rather than appending — otherwise the dots would linger above
+   * the answer.
+   */
+  const settlePending = useCallback((botMessage: Message, flagUnrelated = false) => {
+    setMessages(prev => {
+      const next = [...prev];
+      const at = next.map(m => !!m.pending).lastIndexOf(true);
+      if (at === -1) {
+        next.push(botMessage);       // no placeholder (shouldn't happen) — don't lose the reply
+        return next;
+      }
+      next[at] = botMessage;
+      if (flagUnrelated) {
+        for (let i = at - 1; i >= 0; i--) {
+          if (next[i].isUser) {
+            next[i] = { ...next[i], showQuestionMark: true };
+            break;
+          }
+        }
+      }
+      return next;
+    });
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
 
-    setMessages(prev => [...prev, { text: inputText, isUser: true }]);
+    // The bot starts "thinking" the instant you hit send, in every mode — not only when
+    // the train of thought is on.
+    setMessages(prev => [
+      ...prev,
+      { text: inputText, isUser: true },
+      { text: '', isUser: false, pending: true },
+    ]);
     const userInput = inputText;
     setInputText('');
 
@@ -161,20 +196,7 @@ function Chat() {
         newGameAfter: data.new_game && !restarted,   // a loss — this closed the old one
       };
 
-      if (data.response_code === 'UNRELATED') {
-        setMessages(prev => {
-          const newMessages = [...prev];
-          for (let i = newMessages.length - 1; i >= 0; i--) {
-            if (newMessages[i].isUser) {
-              newMessages[i].showQuestionMark = true;
-              break;
-            }
-          }
-          return [...newMessages, botMessage];
-        });
-      } else {
-        setMessages(prev => [...prev, botMessage]);
-      }
+      settlePending(botMessage, data.response_code === 'UNRELATED');
 
       if (showThoughtProcess && data.train_of_thought && data.train_of_thought.length > 0 && userInput !== lastProcessedMessage) {
         setServerData(data);
@@ -193,10 +215,8 @@ function Chat() {
 
     } catch (error) {
       console.error('Error:', error);
-      setMessages(prev => [...prev, {
-        text: "?",
-        isUser: false
-      }]);
+      // Settle, don't append — otherwise the dots spin forever above the "?".
+      settlePending({ text: "?", isUser: false });
     }
   };
 
@@ -472,18 +492,17 @@ function Chat() {
                   color: message.isUser ? 'var(--bubble-user-text)' : 'var(--bubble-bot-text)',
                   transition: 'background-color 0.25s ease, color 0.25s ease'
                 }}>
-                  {(!message.isUser && index === messages.length - 1) ? (
-                    isTyping && showThoughtProcess ? (
-                      <div className="typing-indicator">
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                      </div>
-                    ) : isTextAnimating ? (
-                      animatedText
-                    ) : (
-                      message.text
-                    )
+                  {/* thinking: while the request is in flight (any mode), and while the
+                      train of thought is still narrowing down to its pick */}
+                  {message.pending || (!message.isUser && index === messages.length - 1
+                                       && isTyping && showThoughtProcess) ? (
+                    <div className="typing-indicator">
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                    </div>
+                  ) : (!message.isUser && index === messages.length - 1) ? (
+                    isTextAnimating ? animatedText : message.text
                   ) : (
                     message.text
                   )}
