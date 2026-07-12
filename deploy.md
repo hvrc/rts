@@ -104,7 +104,11 @@ entrypoint: gunicorn -b :$PORT server:app
 instance_class: F1
 
 automatic_scaling:
-  max_instances: 2
+  # MUST stay 1 while game state is in-memory (engine/state.py). With 2 instances each
+  # keeps its own GAMES dict and requests round-robin between them — the chain splits
+  # and duplicate words slip through, because the instance answering this turn never
+  # saw the word played on the last one. Raising this requires shared storage first.
+  max_instances: 1
 
 env_variables:
   PYTHONUNBUFFERED: '1'

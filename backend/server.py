@@ -49,19 +49,31 @@ def home():
     return "welcome to the rts brain!"
 
 
+def _game_id(data):
+    """One game per browser. Without this every player on the site shares a single
+    chain and stomps each other's words."""
+    gid = data.get("game_id")
+    return gid if isinstance(gid, str) and gid.strip() else engine.SOLO_ID
+
+
 @app.route("/echo", methods=["POST"])
 def echo():
     data = request.get_json(silent=True) or {}
     return jsonify(engine.play(
         data.get("message", ""),
+        game_id=_game_id(data),
         reverse=bool(data.get("reverse", False)),
+        preferences=data.get("preferences"),
     )), 200
 
 
 @app.route("/reset", methods=["POST"])
 def reset():
     data = request.get_json(silent=True) or {}
-    return jsonify(engine.reset(reverse=bool(data.get("reverse", False)))), 200
+    return jsonify(engine.reset(
+        game_id=_game_id(data),
+        reverse=bool(data.get("reverse", False)),
+    )), 200
 
 
 if __name__ == "__main__":

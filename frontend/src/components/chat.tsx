@@ -2,11 +2,21 @@ import React from 'react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import './chat.css';
 import Header from './Header';
+import Rating from './Rating';
+import { gameId, loadPrefs, ratePair, type Link, type Rating as RatingValue } from '../lib/prefs';
 
 interface Message {
   text: string;
   isUser: boolean;
   showQuestionMark?: boolean;
+  link?: Link;          // the leap the bot made (from -> to). only on a played word.
+  rating?: RatingValue; // what the human thought of that leap.
+
+  // Where the game boundary sits relative to this message. A loss message *ends* the
+  // old game, so the divider goes under it. A restart message is the opening move of
+  // the new game, so the divider goes above it.
+  newGameAfter?: boolean;
+  newGameBefore?: boolean;
 }
 
 interface WordState {
@@ -24,6 +34,8 @@ interface ServerResponse {
   response: string;
   train_of_thought: string[][];
   response_code: string;
+  link?: Link;
+  new_game?: boolean;
 }
 
 type Theme = 'light' | 'dark';
@@ -83,12 +95,25 @@ function Chat() {
 
   // Flipping the rule does not restart the game — the chain survives, and the new rule
   // governs every word from here on. The bot just says so.
-  // The AI calls the flip. Announce outside the state updater — StrictMode invokes
-  // updaters twice, which would post the line twice.
+  // The AI calls the flip, and spells out what actually changed. Announce outside the
+  // state updater — StrictMode invokes updaters twice, which would post the line twice.
   const toggleReverse = useCallback(async () => {
-    setReverse(prev => !prev);
+    const next = !reverse;
+    setReverse(next);
     setMessages(m => [...m, { text: '', isUser: false }]);
-    await animateText('new rules...');   // typed out like any other thing it says
+    await animateText(
+      next
+        ? "new rules... every word has to START with r, t or s now. anything else and you're out"
+        : "new rules... back to normal. no word can start with r, t or s"
+    );
+  }, [reverse]);
+
+  // Rating is on the link, not the word: "war" alone teaches the bot nothing, but
+  // "from peace it leapt to war, and I liked that" is a taste it can act on. Saved to
+  // localStorage and sent with every subsequent turn.
+  const rate = useCallback((index: number, link: Link, rating: RatingValue) => {
+    ratePair(link, rating);
+    setMessages(m => m.map((msg, i) => (i === index ? { ...msg, rating } : msg)));
   }, []);
 
   const toggleTheme = useCallback(() => {
@@ -113,12 +138,28 @@ function Chat() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: userInput, reverse: reverseRef.current }),
+        body: JSON.stringify({
+          message: userInput,
+          game_id: gameId(),
+          reverse: reverseRef.current,
+          preferences: loadPrefs(),   // taste travels with every turn
+        }),
       });
 
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
       const data: ServerResponse = await response.json();
+
+      // `link` is present only when the bot actually played a word, which is exactly
+      // when there is something worth rating.
+      const restarted = data.response_code === 'RESTART';
+      const botMessage: Message = {
+        text: data.response,
+        isUser: false,
+        link: data.link,
+        newGameBefore: data.new_game && restarted,   // this word opens the new game
+        newGameAfter: data.new_game && !restarted,   // a loss — this closed the old one
+      };
 
       if (data.response_code === 'UNRELATED') {
         setMessages(prev => {
@@ -129,10 +170,10 @@ function Chat() {
               break;
             }
           }
-          return [...newMessages, { text: data.response, isUser: false }];
+          return [...newMessages, botMessage];
         });
       } else {
-        setMessages(prev => [...prev, { text: data.response, isUser: false }]);
+        setMessages(prev => [...prev, botMessage]);
       }
 
       if (showThoughtProcess && data.train_of_thought && data.train_of_thought.length > 0 && userInput !== lastProcessedMessage) {
@@ -168,7 +209,7 @@ function Chat() {
       await fetch(`${API_URL}/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reverse: reverseRef.current }),
+        body: JSON.stringify({ game_id: gameId(), reverse: reverseRef.current }),
       });
 
       const welcomeMessages = [
@@ -408,9 +449,11 @@ function Chat() {
           {messages.map((message, index) => (
             <div
               key={index}
+              className="rts-msg"
               ref={!message.isUser && index === messages.length - 1 ? latestBotMessageRef : null}
               style={{
                 display: 'flex',
+                alignItems: 'center',
                 justifyContent: message.isUser ? 'flex-end' : 'flex-start',
                 marginBottom: '10px'
               }}
@@ -446,8 +489,22 @@ function Chat() {
                   )}
                 </div>
               </div>
+              {message.link && (
+                <Rating
+                  value={message.rating}
+                  onRate={(r) => rate(index, message.link!, r)}
+                />
+              )}
             </div>
-          ))}
+          )).flatMap((el, index) => {
+            // The history stays on screen across games, so words legitimately repeat
+            // across this line. Mark the boundary or it just reads like a bug.
+            const divider = <div className="rts-newgame" key={`ng-${index}`}>new game</div>;
+            const msg = messages[index];
+            if (msg.newGameBefore) return [divider, el];
+            if (msg.newGameAfter) return [el, divider];
+            return [el];
+          })}
           <div ref={messagesEndRef} />
         </div>
         <form

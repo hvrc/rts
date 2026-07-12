@@ -26,17 +26,26 @@ def system_prompt(rule):
     return _read("system.md").replace("{{LETTER_RULE}}", block)
 
 
-def turn_message(game, player_input, correction=None):
-    """The per-turn user message: the state of the board plus what the human said."""
+def turn_message(game, player_input, correction=None, preferences=None):
+    """The per-turn user message: the state of the board, the human's taste, and what
+    they just said."""
     lines = [
         "Chain so far: "
         + (" -> ".join(game.chain) if game.chain else "(empty — this is the first move)"),
-        "Words already used: "
+        "Words already used (NEVER replay any of these): "
         + (", ".join(sorted(game.used)) if game.used else "(none)"),
         "The human must connect to: "
         + (game.last_word or "(nothing yet — any legal real word is fine)"),
-        f'The human just said: "{player_input}"',
     ]
+
+    taste = preferences.as_prompt_block() if preferences else ""
+    if taste:
+        lines.append("")
+        lines.append(taste)
+        lines.append("")
+
+    lines.append(f'The human just said: "{player_input}"')
+
     if correction:
         lines.append(
             f"NOTE: your previous attempt was rejected ({correction}). Pick a different "

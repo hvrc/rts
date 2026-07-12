@@ -1,0 +1,65 @@
+/* Sits beside a bot bubble. Quiet until you look at it. */
+.rts-rating {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  justify-content: center;
+  margin-left: 6px;
+
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+/* reveal on hover, on keyboard focus, and whenever a rating is already set */
+.rts-msg:hover .rts-rating,
+.rts-rating:focus-within,
+.rts-rating:has(.is-on) {
+  opacity: 1;
+}
+
+/* touch devices have no hover — always show them there */
+@media (hover: none) {
+  .rts-rating {
+    opacity: 1;
+  }
+}
+
+.rts-rate {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  outline: none;
+  border-radius: 50%;
+  cursor: pointer;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-family: inherit;
+  font-size: 10px;
+  line-height: 1;
+
+  background-color: var(--qm-bg);
+  color: var(--qm-text);
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.1s ease;
+}
+
+.rts-rate:hover {
+  transform: scale(1.15);
+}
+
+.rts-rate:active {
+  transform: scale(0.9);
+}
+
+.rts-rate.is-on {
+  background-color: var(--logo-active-bg);
+  color: var(--logo-active-text);
+}
+
+.rts-rate:focus-visible {
+  outline: 2px solid var(--logo-active-bg);
+  outline-offset: 1px;
+}

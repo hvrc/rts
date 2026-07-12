@@ -11,7 +11,8 @@ MOVE_SCHEMA = {
     "properties": {
         "response_code": {
             "type": "string",
-            "enum": ["OK", "UNRELATED", "DUPLICATE", "INVALID", "CHAT", "CONCEDE"],
+            "enum": ["OK", "UNRELATED", "DUPLICATE", "INVALID", "CHAT", "CONCEDE",
+                     "RESTART"],
         },
         "chosen_word": {"type": "string"},
         "train_of_thought": {
