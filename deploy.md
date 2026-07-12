@@ -12,10 +12,14 @@ The app runs as two App Engine **services** in one project:
 
 | Service   | Runtime      | Source        | Serves                                                        |
 |-----------|--------------|---------------|--------------------------------------------------------------|
-| `default` | nodejs20     | `frontend/`   | the built Vite SPA (`dist/`) — the main site                 |
+| `default` | nodejs22     | `frontend/`   | the built Vite SPA (`dist/`) — the main site                 |
 | `backend` | python312    | `backend/`    | the Flask API (`/echo`, `/reset`) — the Claude game brain    |
 
 > A third service, `frontend` (nodejs22), is an old/unused deploy target. Ignore it.
+
+> **Runtimes hit end-of-support.** `gcloud app deploy` rejected `nodejs20` outright in
+> July 2026 ("end of support and no longer allowed"). If a deploy dies during runtime
+> validation, bump `runtime:` in `frontend/app.yaml` to the current Node LTS.
 
 The frontend calls the backend at the hardcoded prod URL in
 `frontend/src/components/chat.tsx` (`import.meta.env.PROD` branch). The backend
@@ -134,7 +138,7 @@ README.md
 ### `frontend/app.yaml` (for the `default` service)
 
 ```yaml
-runtime: nodejs20
+runtime: nodejs22
 service: default
 
 env_variables:

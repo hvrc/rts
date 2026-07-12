@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState, useRef, useEffect } from 'react';
-import './Chat.css';
+import './chat.css';
 import Logo from './Logo';
 
 interface Message {
