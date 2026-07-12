@@ -1,8 +1,12 @@
-"""RTS backend — thin Flask layer over engine.py.
+"""RTS backend — thin Flask layer over the engine package.
 
-Endpoints match the frozen frontend contract exactly:
-  POST /echo  {"message": str}  -> {response, train_of_thought, response_code}
-  POST /reset                   -> {response, train_of_thought}
+  POST /echo  {"message": str, "reverse": bool}  -> {response, train_of_thought, response_code}
+  POST /reset {"reverse": bool}                  -> {response, train_of_thought}
+
+`reverse` is the letter-rule mode, owned by the client (the "r" button in the header).
+It rides along on every request rather than being stored server-side, so the two can
+never disagree about which rule is in force. It defaults to false, which is the
+original game.
 """
 
 import os
@@ -48,13 +52,16 @@ def home():
 @app.route("/echo", methods=["POST"])
 def echo():
     data = request.get_json(silent=True) or {}
-    message = data.get("message", "")
-    return jsonify(engine.play(message)), 200
+    return jsonify(engine.play(
+        data.get("message", ""),
+        reverse=bool(data.get("reverse", False)),
+    )), 200
 
 
 @app.route("/reset", methods=["POST"])
 def reset():
-    return jsonify(engine.reset()), 200
+    data = request.get_json(silent=True) or {}
+    return jsonify(engine.reset(reverse=bool(data.get("reverse", False)))), 200
 
 
 if __name__ == "__main__":

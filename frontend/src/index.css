@@ -2,6 +2,70 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---------------------------------------------------------------------------
+   Theme.
+
+   Light is the original palette, unchanged. Dark is new. The "t" circle in the
+   header flips [data-theme] on <html>; every component reads these variables, so
+   nothing hardcodes a color anymore.
+   --------------------------------------------------------------------------- */
+:root,
+:root[data-theme='light'] {
+  --bg: #ffffff;
+  --surface: #ffffff;
+
+  --bubble-bot-bg: #e9e9eb;
+  --bubble-bot-text: #000000;
+  --bubble-user-bg: #ffac1c;
+  --bubble-user-text: #ffffff;
+
+  --input-bg: #ffffff;
+  --input-text: #000000;
+  --input-border: #e9e9eb;
+
+  --tot-text: #666666;
+  --typing-dot: #888888;
+
+  --qm-bg: #d3d3d3;
+  --qm-text: #7c7c7c;
+
+  --logo-bg: #ffac1c;
+  --logo-text: #ffffff;
+  --logo-hover-bg: #efa219;
+  --logo-active-bg: #8b5cf6; /* purple = this toggle is on */
+  --logo-active-text: #ffffff;
+
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --bg: #14151a;
+  --surface: #14151a;
+
+  --bubble-bot-bg: #26282f;
+  --bubble-bot-text: #e8e9ec;
+  --bubble-user-bg: #ffac1c; /* the brand orange survives the theme */
+  --bubble-user-text: #ffffff;
+
+  --input-bg: #1c1e24;
+  --input-text: #e8e9ec;
+  --input-border: #33363f;
+
+  --tot-text: #8a9099;
+  --typing-dot: #8a9099;
+
+  --qm-bg: #3a3d45;
+  --qm-text: #b9bdc4;
+
+  --logo-bg: #ffac1c;
+  --logo-text: #ffffff;
+  --logo-hover-bg: #efa219;
+  --logo-active-bg: #a78bfa; /* a touch lighter so it reads against a dark field */
+  --logo-active-text: #ffffff;
+
+  color-scheme: dark;
+}
+
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -17,6 +81,8 @@ html, body {
   position: fixed;
   width: 100%;
   touch-action: none;
+  background-color: var(--bg);
+  transition: background-color 0.25s ease;
 }
 
 #root {

@@ -1,7 +1,7 @@
 import React from 'react';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import './chat.css';
-import Logo from './Logo';
+import Header from './Header';
 
 interface Message {
   text: string;
@@ -26,8 +26,17 @@ interface ServerResponse {
   response_code: string;
 }
 
+type Theme = 'light' | 'dark';
+
+const THEME_KEY = 'rts.theme';
+
+function initialTheme(): Theme {
+  const saved = localStorage.getItem(THEME_KEY);
+  return saved === 'dark' ? 'dark' : 'light'; // light is the original look; it stays the default
+}
+
 function Chat() {
-  const API_URL = import.meta.env.PROD 
+  const API_URL = import.meta.env.PROD
     ? 'https://backend-dot-rts0-462101.ue.r.appspot.com'
     : 'http://localhost:5001';
 
@@ -41,14 +50,28 @@ function Chat() {
   const [isTyping, setIsTyping] = useState(false);
   const [animatedText, setAnimatedText] = useState("");
   const [isTextAnimating, setIsTextAnimating] = useState(false);
-  const [showThoughtProcess, setShowThoughtProcess] = useState(false);
   const [lastProcessedMessage, setLastProcessedMessage] = useState<string | null>(null);
+
+  // The three header toggles.
+  const [showThoughtProcess, setShowThoughtProcess] = useState(false); // s
+  const [theme, setTheme] = useState<Theme>(initialTheme);             // t
+  const [reverse, setReverse] = useState(false);                       // r
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const latestBotMessageRef = useRef<HTMLDivElement>(null);
   const chatBoxRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const trainOfThoughtButtonRef = useRef<HTMLDivElement>(null);
-  const darkModeButtonRef = useRef<HTMLDivElement>(null);
+
+  // `reverse` is read inside async handlers that would otherwise close over a stale
+  // value; the ref always has the current one.
+  const reverseRef = useRef(reverse);
+  useEffect(() => { reverseRef.current = reverse; }, [reverse]);
+
+  // Theme lives on <html> so index.css can drive every color from one attribute.
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem(THEME_KEY, theme);
+  }, [theme]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -58,6 +81,27 @@ function Chat() {
     scrollToBottom();
   }, [messages]);
 
+  // Flipping the rule does not restart the game — the chain survives, and the new rule
+  // governs every word from here on. The bot just says so.
+  // Announce outside the state updater: StrictMode invokes updaters twice, so queuing
+  // the message in there posts it twice.
+  const toggleReverse = useCallback(() => {
+    const next = !reverse;
+    setReverse(next);
+    setMessages(m => [...m, {
+      text: next ? 'flipped. rts words only now' : 'back to normal. no rts',
+      isUser: false,
+    }]);
+  }, [reverse]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+  }, []);
+
+  const toggleThoughts = useCallback(() => {
+    setShowThoughtProcess(prev => !prev);
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
@@ -65,14 +109,14 @@ function Chat() {
     setMessages(prev => [...prev, { text: inputText, isUser: true }]);
     const userInput = inputText;
     setInputText('');
-    
+
     try {
       const response = await fetch(`${API_URL}/echo`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: userInput }),
+        body: JSON.stringify({ message: userInput, reverse: reverseRef.current }),
       });
 
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -111,21 +155,23 @@ function Chat() {
 
     } catch (error) {
       console.error('Error:', error);
-      setMessages(prev => [...prev, { 
-        text: "?", 
-        isUser: false 
+      setMessages(prev => [...prev, {
+        text: "?",
+        isUser: false
       }]);
     }
   };
 
   useEffect(() => {
     let mounted = true;
-    
+
     const initializeChat = async () => {
       if (!mounted) return;
 
       await fetch(`${API_URL}/reset`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reverse: reverseRef.current }),
       });
 
       const welcomeMessages = [
@@ -134,12 +180,12 @@ function Chat() {
         "they can't start with r t or s",
         'u start...',
       ];
-      
+
       for (const message of welcomeMessages) {
         if (!mounted) break;
-        
+
         setMessages(prev => [...prev, { text: "", isUser: false }]);
-        
+
         setIsTextAnimating(true);
         setAnimatedText("");
         for (let i = 0; i < message.length; i++) {
@@ -147,20 +193,20 @@ function Chat() {
           setAnimatedText(prev => prev + message[i]);
           await new Promise(resolve => setTimeout(resolve, 25));
         }
-        
+
         setMessages(prev => {
           const newMessages = [...prev];
           newMessages[newMessages.length - 1].text = message;
           return newMessages;
         });
         setIsTextAnimating(false);
-        
+
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     };
 
     initializeChat();
-    
+
     return () => {
       mounted = false;
     };
@@ -185,11 +231,11 @@ function Chat() {
       setAnimatingWords([]);
       return;
     }
-    
+
     const animate = async () => {
       setIsAnimating(true);
       setIsTyping(true);
-      
+
       for (let i = 0; i < serverData.train_of_thought.length - 1; i++) {
         const currentList = serverData.train_of_thought[i];
         const nextList = serverData.train_of_thought[i + 1];
@@ -215,8 +261,8 @@ function Chat() {
           await new Promise(resolve => setTimeout(resolve, 50));
 
           for (let j = 0; j < currentList.length; j++) {
-            setAnimatingWords(prev => 
-              prev.map((w, index) => 
+            setAnimatingWords(prev =>
+              prev.map((w, index) =>
                 index === j ? { ...w, opacity: 1 } : w
               )
             );
@@ -227,10 +273,10 @@ function Chat() {
         }
 
         const wordsToRemove = currentList.filter(word => !nextList.includes(word));
-        
+
         if (wordsToRemove.length > 0) {
           for (const word of wordsToRemove) {
-            setAnimatingWords(prev => 
+            setAnimatingWords(prev =>
               prev.map(w => ({
                 ...w,
                 opacity: w.word === word ? 0 : w.opacity
@@ -243,11 +289,11 @@ function Chat() {
         if (i === serverData.train_of_thought.length - 2) {
           await new Promise(resolve => setTimeout(resolve, 500));
           setIsTyping(false);
-          
+
           await animateText(messages[messages.length - 1].text);
-          
+
           await new Promise(resolve => setTimeout(resolve, 300));
-          setAnimatingWords(prev => 
+          setAnimatingWords(prev =>
             prev.map(w => ({
               ...w,
               opacity: 0
@@ -258,7 +304,7 @@ function Chat() {
     };
 
     animate();
-    
+
     return () => {
       setAnimatingWords([]);
       setIsAnimating(false);
@@ -268,173 +314,26 @@ function Chat() {
 
   const animateText = async (text: string) => {
     if (!text) return;
-    
+
     setIsTextAnimating(true);
     setAnimatedText("");
-    
+
     for (let i = 0; i < text.length; i++) {
       setAnimatedText(prev => prev + text[i]);
       await new Promise(resolve => setTimeout(resolve, 25));
     }
-    
+
     setMessages(prev => {
       const newMessages = [...prev];
       newMessages[newMessages.length - 1].text = text;
       return newMessages;
     });
-    
+
     setIsTextAnimating(false);
   };
 
-  const HeaderComponent = () => {
-    const [isDarkMode] = useState(false);
-
-    const buttonContainerStyle = {
-      display: 'flex',
-      gap: '8px',
-      alignItems: 'center',
-      marginRight: '45px',
-      marginTop: '10px'
-    };
-
-    const buttonStyle = {
-      width: '25px',
-      height: '25px',
-      padding: 0,
-      minWidth: '25px',
-      minHeight: '25px',
-      borderRadius: '50%',
-      backgroundColor: '#E9E9EB',
-      color: '#666',
-      border: 'none',
-      outline: 'none',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontSize: '14px',
-      transition: 'background-color 0.3s ease',
-      position: 'relative'
-    } as React.CSSProperties;
-
-    const labelStyle = {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      borderRadius: '50%',
-      cursor: 'pointer',
-      transition: 'background-color 0.3s ease'
-    } as React.CSSProperties;
-
-    useEffect(() => {
-      if (trainOfThoughtButtonRef.current) {
-        trainOfThoughtButtonRef.current.style.backgroundColor = showThoughtProcess ? '#CCCCFF' : '#E9E9EB';
-      }
-      if (darkModeButtonRef.current) {
-        darkModeButtonRef.current.style.backgroundColor = isDarkMode ? '#CCCCFF' : '#E9E9EB';
-      }
-    }, [showThoughtProcess, isDarkMode]);
-
-    return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        width: '100%',
-        padding: '4px 10px 16px 30px'
-      }}>
-        <Logo />
-        <div style={buttonContainerStyle}>
-          {/* Train of Thought button */}
-          <div style={{ position: 'relative' }}>
-            <div
-              ref={trainOfThoughtButtonRef}
-              style={{
-                ...buttonStyle,
-                backgroundColor: showThoughtProcess ? '#CCCCFF' : '#E9E9EB'
-              }}
-            >
-              <input
-                type="checkbox"
-                id="trainOfThoughtToggle"
-                style={{
-                  opacity: 0,
-                  position: 'absolute',
-                  width: '100%',
-                  height: '100%',
-                  margin: 0,
-                  cursor: 'pointer'
-                }}
-                checked={showThoughtProcess}
-                onChange={(e) => {
-                  setShowThoughtProcess(e.currentTarget.checked);
-                }}
-                onMouseOver={(e) => {
-                  const container = e.currentTarget.parentElement;
-                  if (container && !showThoughtProcess) {
-                    container.style.backgroundColor = '#D3D3D3';
-                  }
-                }}
-                onMouseOut={(e) => {
-                  const container = e.currentTarget.parentElement;
-                  if (container && !showThoughtProcess) {
-                    container.style.backgroundColor = '#E9E9EB';
-                  }
-                }}
-              />
-              <label htmlFor="trainOfThoughtToggle" style={labelStyle} title="Train of Thought"></label>
-            </div>
-          </div>
-
-          {/* Dark Mode button (right) */}
-          {/* <div style={{ position: 'relative' }}>
-            <div
-              ref={darkModeButtonRef}
-              style={{
-                ...buttonStyle,
-                backgroundColor: isDarkMode ? '#CCCCFF' : '#E9E9EB'
-              }}
-            >
-              <input
-                type="checkbox"
-                id="darkModeToggle"
-                style={{
-                  opacity: 0,
-                  position: 'absolute',
-                  width: '100%',
-                  height: '100%',
-                  margin: 0,
-                  cursor: 'pointer'
-                }}
-                checked={isDarkMode}
-                onChange={(e) => {
-                  setIsDarkMode(e.currentTarget.checked);
-                }}
-                onMouseOver={(e) => {
-                  const container = e.currentTarget.parentElement;
-                  if (container && !isDarkMode) {
-                    container.style.backgroundColor = '#D3D3D3';
-                  }
-                }}
-                onMouseOut={(e) => {
-                  const container = e.currentTarget.parentElement;
-                  if (container && !isDarkMode) {
-                    container.style.backgroundColor = '#E9E9EB';
-                  }
-                }}
-              />
-              <label htmlFor="darkModeToggle" style={labelStyle} title="Dark Mode"></label>
-            </div>
-          </div> */}
-        </div>
-      </div>
-    );
-  };
-
   return (
-    <div style={{ 
+    <div style={{
       position: 'fixed',
       width: '280px',
       height: '100%',
@@ -442,10 +341,14 @@ function Chat() {
       display: 'flex',
       flexDirection: 'column',
     }}>
-      <HeaderComponent />
-      <div 
+      <Header
+        reverse={{ on: reverse, toggle: toggleReverse }}
+        theme={{ on: theme === 'dark', toggle: toggleTheme }}
+        thoughts={{ on: showThoughtProcess, toggle: toggleThoughts }}
+      />
+      <div
         ref={chatBoxRef}
-        style={{ 
+        style={{
           flex: 1,
           width: '100%',
           display: 'flex',
@@ -454,8 +357,8 @@ function Chat() {
           overflow: 'hidden'
         }}
       >
-        <div 
-          ref={messagesContainerRef} 
+        <div
+          ref={messagesContainerRef}
           className="messages-container"
           style={{
             flex: 1,
@@ -483,7 +386,7 @@ function Chat() {
                     position: 'absolute',
                     padding: '2px 4px',
                     fontSize: '12px',
-                    color: '#666',
+                    color: 'var(--tot-text)',
                     whiteSpace: 'nowrap',
                     transform: `translate(${
                       Math.min(Math.max(wordState.position.x, 0), 260)
@@ -492,8 +395,8 @@ function Chat() {
                     }px) rotate(${wordState.position.rotate}deg) scale(${wordState.position.scale})`,
                     opacity: wordState.opacity,
                     transition: `opacity ${
-                      wordState.opacity === 0 ? '2s' : 
-                      wordState.opacity === 1 ? '1s' : 
+                      wordState.opacity === 0 ? '2s' :
+                      wordState.opacity === 1 ? '1s' :
                       '0.1s'
                     } ${
                       wordState.opacity === 0 ? 'ease-out' : 'ease-in'
@@ -525,8 +428,9 @@ function Chat() {
                   maxWidth: '100%',
                   padding: '8px 12px',
                   borderRadius: '12px',
-                  backgroundColor: message.isUser ? '#FFAC1C' : '#E9E9EB',
-                  color: message.isUser ? 'white' : 'black'
+                  backgroundColor: message.isUser ? 'var(--bubble-user-bg)' : 'var(--bubble-bot-bg)',
+                  color: message.isUser ? 'var(--bubble-user-text)' : 'var(--bubble-bot-text)',
+                  transition: 'background-color 0.25s ease, color 0.25s ease'
                 }}>
                   {(!message.isUser && index === messages.length - 1) ? (
                     isTyping && showThoughtProcess ? (
@@ -549,15 +453,16 @@ function Chat() {
           ))}
           <div ref={messagesEndRef} />
         </div>
-        <form 
-          onSubmit={handleSubmit} 
+        <form
+          onSubmit={handleSubmit}
           style={{
             display: 'flex',
             gap: '8px',
             padding: '10px',
             position: 'relative',
             zIndex: 3,
-            backgroundColor: '#fff'
+            backgroundColor: 'var(--surface)',
+            transition: 'background-color 0.25s ease'
           }}
         >
           <input
@@ -569,12 +474,15 @@ function Chat() {
               flex: 1,
               padding: '8px 12px',
               borderRadius: '20px',
-              border: '1px solid #E9E9EB',
+              border: '1px solid var(--input-border)',
+              backgroundColor: 'var(--input-bg)',
+              color: 'var(--input-text)',
               outline: 'none',
               fontSize: window.innerWidth <= 768 ? '16px' : '14px',
               WebkitAppearance: 'none',
               touchAction: 'manipulation',
-              userSelect: 'text'
+              userSelect: 'text',
+              transition: 'background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease'
             }}
           />
           <button
@@ -584,8 +492,8 @@ function Chat() {
               height: '25px',
               padding: 0,
               borderRadius: '50%',
-              backgroundColor: '#FFAC1C',
-              color: 'white',
+              backgroundColor: 'var(--bubble-user-bg)',
+              color: 'var(--bubble-user-text)',
               border: 'none',
               outline: 'none',
               cursor: 'pointer',

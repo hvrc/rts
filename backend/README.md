@@ -1,40 +1,95 @@
-# RTS backend (Anthropic overhaul)
+# RTS backend
 
-The WordNet/BERT/nltk engine is gone. The brain is now a single Claude call per turn
-with the rules of RTS burned into a cached system prompt, plus a thin layer of
-deterministic code for the two things that must be 100% reliable: the **R/T/S letter
-ban** and **duplicate detection**.
+A thin Flask app over an `engine` package. Deterministic code owns the rules that must
+be 100% reliable (the letter rule, duplicates); a model owns everything judgment-shaped
+(relatedness, banter, strategy, its own move).
 
-## Architecture
+## Layout
 
 ```
-frontend (unchanged)
-   │  POST /echo {message}
-   ▼
-server.py (Flask, thin)  ──►  engine.py
-                                1. deterministic pre-checks (free, reliable):
-                                     empty · starts with r/t/s · exact dup/variation
-                                     → ruled without calling the model
-                                2. otherwise → one Claude call (structured output):
-                                     response_code, chosen_word, train_of_thought[][], response
-                                3. deterministic post-check on the AI's own word
-                                     (never r/t/s, never a dup) → one retry, else concede
-                                4. update in-memory GameState, return the contract JSON
+server.py              Flask. Two routes, no logic.
+engine/
+  __init__.py          the public surface: play(), reset()
+  config.py            every knob, read from env — which provider, which model
+  rules.py             the deterministic rules, incl. the reversible letter rule
+  state.py             game state, keyed by id (multiplayer is a routing change)
+  prompts.py           loads prompts/*.md
+  prompts/
+    system.md          the brain. natural language, no code. edit this to change how it plays.
+    letter_rule.normal.md    r/t/s are banned
+    letter_rule.reverse.md   r/t/s are the ONLY legal openers
+  schema.py            the structured move every provider must return
+  providers/           the brains
+    base.py            the interface: move(system_prompt, user_message, ctx) -> dict
+    anthropic_provider.py
+    openai_provider.py OpenAI-compatible: Ollama, LM Studio, vLLM, llama.cpp, Groq, ...
+    stub_provider.py   no network. tests and offline dev.
+  contract.py          the frontend payload shape
+  turn.py              orchestration: pre-checks -> brain -> post-checks -> advance
 ```
 
-- **Model:** `claude-sonnet-4-6`, structured output via `output_config.format`,
-  `thinking: disabled` + `effort: low` for snappy turns, system prompt cached with
-  `cache_control`.
-- **State:** a single in-memory `GameState` (chain, used words, last word). `/reset`
-  clears it. Deliberately global — this is a local single-player toy.
+## The shape of a turn
 
-## Frozen frontend contract (unchanged)
+```
+1. deterministic pre-checks   letter rule, duplicates       (rules.py)
+2. ask the brain              one structured call           (providers/)
+3. deterministic post-checks  the AI must obey rules too    (rules.py)
+                              one retry, else concede
+4. advance the chain          (state.py), shape the reply   (contract.py)
+```
 
-- `POST /echo {"message": str}` → `{response, train_of_thought: [[...]], response_code}`
-- `POST /reset` → `{response, train_of_thought}`
-- `response_code == "UNRELATED"` is the only code the UI treats specially (stamps a
-  "?" on the player's bubble). Codes: `OK · UNRELATED · DUPLICATE · INVALID · CHAT ·
-  CONCEDE · RTS` (+ `ERROR` on failure).
+Steps 1 and 3 exist because a model is not 100% reliable and those two rules must be.
+
+## Changing how the AI plays
+
+Edit `engine/prompts/system.md`. No Python involved. The files are re-read every turn,
+so an edit takes effect on the next move without a restart.
+
+## Changing the model
+
+Config, not code.
+
+```bash
+# Anthropic (default)
+RTS_PROVIDER=anthropic
+RTS_MODEL=claude-haiku-4-5
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Any OpenAI-compatible server — local or hosted
+RTS_PROVIDER=openai
+RTS_BASE_URL=http://localhost:11434/v1   # Ollama, LM Studio, vLLM, llama.cpp, Groq...
+RTS_MODEL=llama3.1
+
+# No network at all
+RTS_PROVIDER=stub
+```
+
+To add a provider: subclass `Provider`, implement `move()`, add one line to the registry
+in `providers/__init__.py`.
+
+## The letter rule, and the reverser
+
+`LetterRule` governs both directions from one object, so the two modes cannot drift:
+
+- **normal** — a word may NOT start with r/t/s.
+- **reversed** — a word may ONLY start with r/t/s.
+
+The client owns the toggle (the "r" circle in the header) and sends `reverse` on every
+request, so the frontend and backend can't disagree about which rule is in force.
+Flipping mid-game keeps the chain — the new rule governs words from there on.
+
+## API
+
+```
+POST /echo  {"message": str, "reverse": bool}
+         -> {response, train_of_thought: [[...]], response_code}
+POST /reset {"reverse": bool}
+         -> {response, train_of_thought}
+```
+
+`response_code` is one of `OK · UNRELATED · DUPLICATE · INVALID · CHAT · CONCEDE · RTS`
+(+ `ERROR`). The UI only treats `UNRELATED` specially (it stamps a "?" on the player's
+bubble); everything else just displays `response`.
 
 ## Run locally
 
@@ -42,17 +97,21 @@ server.py (Flask, thin)  ──►  engine.py
 cd backend
 python3 -m venv venv && ./venv/bin/pip install -r requirements.txt
 cp .env.example .env            # then put your ANTHROPIC_API_KEY in .env
-./venv/bin/python server.py     # serves on :5000
+PORT=5001 ./venv/bin/python server.py
 ```
 
-On macOS, AirPlay Receiver usually occupies port 5000. Either disable it
-(System Settings → General → AirDrop & Handoff → AirPlay Receiver), or run
-`PORT=5001 ./venv/bin/python server.py` and point the frontend's dev `API_URL`
-(`frontend/src/components/chat.tsx`) at `http://localhost:5001`.
+macOS AirPlay squats on port 5000, hence 5001 — which is what the frontend's dev
+`API_URL` already points at.
 
-## Tuning the brain
+Offline, with no key at all:
 
-Everything that makes the AI good at RTS lives in `SYSTEM_PROMPT` in `engine.py` —
-the rules, the "balanced" connection philosophy (human-but-defensible links),
-competitive strategy (spring R/T/S traps), persona, and few-shot examples. Tune the
-prompt, not the code.
+```bash
+RTS_PROVIDER=stub PORT=5001 ./venv/bin/python server.py
+```
+
+## Known wart
+
+The `cache_control` on the system prompt is a no-op today. The prompt is ~1.4k tokens and
+Haiku 4.5 will not cache a prefix below 4096, so the API silently declines and every turn
+pays full input price. It's left in place so it starts working if the prompt grows past
+that floor.

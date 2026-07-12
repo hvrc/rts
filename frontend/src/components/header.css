@@ -1,0 +1,54 @@
+.rts-header {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  padding: 8px 0 16px 0;
+}
+
+.rts-toggle {
+  width: 30px;
+  height: 30px;
+  margin: 0 2px;
+  padding: 0;
+  border: none;
+  outline: none;
+  border-radius: 50%;
+  cursor: pointer;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-family: inherit;
+  font-size: 18px;
+  line-height: 1;
+
+  background-color: var(--logo-bg);
+  color: var(--logo-text);
+  transition: background-color 0.25s ease, transform 0.1s ease;
+}
+
+/* the letters sat 2px high in the original logo — keep the optical centering */
+.rts-toggle > span {
+  margin-top: -2px;
+}
+
+.rts-toggle:hover {
+  background-color: var(--logo-hover-bg);
+}
+
+.rts-toggle:active {
+  transform: scale(0.92);
+}
+
+/* purple = on */
+.rts-toggle.is-on,
+.rts-toggle.is-on:hover {
+  background-color: var(--logo-active-bg);
+  color: var(--logo-active-text);
+}
+
+.rts-toggle:focus-visible {
+  outline: 2px solid var(--logo-active-bg);
+  outline-offset: 2px;
+}
