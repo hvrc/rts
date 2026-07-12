@@ -80,6 +80,22 @@ def play(player_input, game_id=SOLO_ID, reverse=False, preferences=None):
         code = data.get("response_code", "INVALID")
         reply = (data.get("response") or "").strip()
 
+    # Veto a bogus duplicate call. Repeating is a losing move now, so a model that
+    # mistakes a synonym for a repeat ("win's basically victory") ends the game on a
+    # legal play. Duplicates are deterministic — if the word isn't actually one, the
+    # model doesn't get to say it is.
+    if code == "DUPLICATE" and not rules.looks_like_duplicate(text.lower(), game.used):
+        try:
+            data = _ask(game, text, taste=taste, spent=spent,
+                        correction="that word has NOT been played. A different word that "
+                                   "happens to mean something similar is NOT a repeat — "
+                                   "only the same word, or a plural/tense of it, is. "
+                                   "Accept the move and play on.")
+        except Exception as e:
+            return contract.error(e)
+        code = data.get("response_code", "INVALID")
+        reply = (data.get("response") or "").strip()
+
     # --- the human asked to start over, or asked the AI to open ---
     if code == "RESTART":
         return _restart(game_id, rule, data, reply)
@@ -88,7 +104,8 @@ def play(player_input, game_id=SOLO_ID, reverse=False, preferences=None):
     if code == "CONCEDE":
         return _lose(game_id, rule, "CONCEDE", reply or "ok, you got me. new game — go")
 
-    # --- the model caught a subtler repeat than the deterministic check could ---
+    # --- a real repeat the deterministic pre-check couldn't see (an irregular plural,
+    #     or a word buried in prose) ---
     if code == "DUPLICATE":
         return _lose(game_id, rule, "DUPLICATE", reply or "already played. you lose. new game — go")
 

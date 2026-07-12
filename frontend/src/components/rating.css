@@ -1,65 +1,96 @@
-/* Sits beside a bot bubble. Quiet until you look at it. */
-.rts-rating {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  justify-content: center;
-  margin-left: 6px;
+/* The original rating circles: same 20px shape as the "?" badge, pinned to the bubble's
+   two right-hand corners — thumbs-up top-right, thumbs-down bottom-right.
 
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
+   Hidden until you hover the message. A rating you've already given stays visible, so
+   you can see what you told it. */
 
-/* reveal on hover, on keyboard focus, and whenever a rating is already set */
-.rts-msg:hover .rts-rating,
-.rts-rating:focus-within,
-.rts-rating:has(.is-on) {
-  opacity: 1;
-}
-
-/* touch devices have no hover — always show them there */
-@media (hover: none) {
-  .rts-rating {
-    opacity: 1;
-  }
-}
-
-.rts-rate {
-  width: 16px;
-  height: 16px;
+.rating-circle {
+  position: absolute;
+  right: -10px;
+  width: 20px;
+  height: 20px;
   padding: 0;
   border: none;
   outline: none;
   border-radius: 50%;
   cursor: pointer;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  font-family: inherit;
-  font-size: 10px;
-  line-height: 1;
+  z-index: 4;
 
   background-color: var(--qm-bg);
-  color: var(--qm-text);
-  transition: background-color 0.2s ease, color 0.2s ease, transform 0.1s ease;
+
+  /* out of sight, and out of the way of clicks, until the message is hovered */
+  opacity: 0;
+  transform: scale(0.8);
+  pointer-events: none;
+
+  transition: opacity 0.15s ease, transform 0.15s ease, background-color 0.2s ease;
 }
 
-.rts-rate:hover {
-  transform: scale(1.15);
+.like-circle    { top: -10px; }
+.dislike-circle { bottom: -10px; }
+
+/* The thumb glyph, tinted through a mask rather than baked into the image — one asset,
+   and it stays legible in dark mode. */
+.rating-circle::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 12px;
+  height: 12px;
+  background-color: var(--qm-text);
+  -webkit-mask-image: url('/thumb.png');
+  mask-image: url('/thumb.png');
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  transition: background-color 0.2s ease;
 }
 
-.rts-rate:active {
-  transform: scale(0.9);
+/* the down thumb is the up thumb, upside down */
+.dislike-circle::before {
+  transform: rotate(180deg);
 }
 
-.rts-rate.is-on {
-  background-color: var(--logo-active-bg);
-  color: var(--logo-active-text);
+/* reveal: hovering the message, tabbing to the button, or having already rated */
+.rts-msg:hover .rating-circle,
+.rating-circle:focus-visible,
+.rating-circle.selected {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
 }
 
-.rts-rate:focus-visible {
+/* Touch has no hover, so a tap on the bot's bubble opens them instead. Without this the
+   circles would either be permanently visible (clutter) or unreachable. */
+@media (hover: none) {
+  .rts-msg:hover .rating-circle {
+    opacity: 0;
+    transform: scale(0.8);
+    pointer-events: none;
+  }
+
+  .rts-msg.is-tapped .rating-circle {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+  }
+}
+
+.rating-circle:hover  { transform: scale(1.1); }
+.rating-circle:active { transform: scale(0.92); }
+
+.like-circle.selected    { background-color: #6fbe67; }
+.dislike-circle.selected { background-color: #e04343; }
+
+.rating-circle.selected::before {
+  background-color: #ffffff;
+}
+
+.rating-circle:focus-visible {
   outline: 2px solid var(--logo-active-bg);
   outline-offset: 1px;
 }

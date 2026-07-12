@@ -50,27 +50,6 @@
   }
 }
 
-/* The chat history survives a loss, so words repeat below this line. Mark where the
-   old game ended, or it reads like the bot forgot. */
-.rts-newgame {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 4px 0 14px;
-  color: var(--tot-text);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.rts-newgame::before,
-.rts-newgame::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--input-border);
-}
-
 .question-mark-circle {
   position: absolute;
   top: -10px;

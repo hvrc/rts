@@ -7,6 +7,7 @@ prompt instead.
 Add a new rule by writing a class with the same shape and wiring it into turn.py.
 """
 
+import difflib
 import re
 
 RTS_LETTERS = ("r", "t", "s")
@@ -48,11 +49,31 @@ def is_single_word(text):
     return bool(re.fullmatch(r"[A-Za-z]+", text or ""))
 
 
+def looks_like_duplicate(word, used):
+    """Would anyone actually call this word a repeat?
+
+    A repeat is the SAME word, or a trivial variation of it — dog/dogs, run/running.
+    Two *different* words that happen to mean similar things are not repeats: "win" and
+    "victory" are two words, and both are legal.
+
+    This exists as a veto over the model. Repeating is now a losing move, so a model
+    that calls a synonym a duplicate ends the game on a perfectly legal play — which is
+    exactly what it did. Duplicate detection is deterministic; the model doesn't get a
+    vote it can't be trusted with.
+
+    The similarity check catches irregulars the suffix rules miss (mouse/mice) while
+    staying far below anything a synonym would score.
+    """
+    w = (word or "").lower()
+    if is_variation(w, used):
+        return True
+    return any(difflib.SequenceMatcher(None, w, u).ratio() >= 0.85 for u in used)
+
+
 def is_variation(word, used):
     """Cheap trivial-variation check (plural / simple tense) against used words.
 
-    Not exhaustive — the model catches the subtle cases; this just makes the obvious
-    ones free and reliable.
+    Not exhaustive — see looks_like_duplicate for the fuzzier backstop.
     """
     w = (word or "").lower()
     if w in used:

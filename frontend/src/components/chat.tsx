@@ -12,12 +12,6 @@ interface Message {
   link?: Link;          // the leap the bot made (from -> to). only on a played word.
   rating?: RatingValue; // what the human thought of that leap.
 
-  // Where the game boundary sits relative to this message. A loss message *ends* the
-  // old game, so the divider goes under it. A restart message is the opening move of
-  // the new game, so the divider goes above it.
-  newGameAfter?: boolean;
-  newGameBefore?: boolean;
-
   // An empty bot bubble holding the bot's place while it thinks. Renders as the dots.
   pending?: boolean;
 }
@@ -66,6 +60,10 @@ function Chat() {
   const [animatedText, setAnimatedText] = useState("");
   const [isTextAnimating, setIsTextAnimating] = useState(false);
   const [lastProcessedMessage, setLastProcessedMessage] = useState<string | null>(null);
+
+  // Which bot message has been tapped open. Touch has no hover, so the thumbs need a
+  // tap to appear; on desktop hover already handles it and this is inert.
+  const [tapped, setTapped] = useState<number | null>(null);
 
   // The three header toggles.
   const [showThoughtProcess, setShowThoughtProcess] = useState(false); // s
@@ -186,14 +184,13 @@ function Chat() {
       const data: ServerResponse = await response.json();
 
       // `link` is present only when the bot actually played a word, which is exactly
-      // when there is something worth rating.
-      const restarted = data.response_code === 'RESTART';
+      // when there is something worth rating. `new_game` is deliberately not surfaced:
+      // the backend wipes the board, the bot says so in its own words, and the
+      // conversation just carries on.
       const botMessage: Message = {
         text: data.response,
         isUser: false,
         link: data.link,
-        newGameBefore: data.new_game && restarted,   // this word opens the new game
-        newGameAfter: data.new_game && !restarted,   // a loss — this closed the old one
       };
 
       settlePending(botMessage, data.response_code === 'UNRELATED');
@@ -469,11 +466,12 @@ function Chat() {
           {messages.map((message, index) => (
             <div
               key={index}
-              className="rts-msg"
+              // `is-tapped` is what reveals the thumbs on touch, where there is no hover.
+              className={`rts-msg${tapped === index ? ' is-tapped' : ''}`}
+              onClick={message.link ? () => setTapped(t => (t === index ? null : index)) : undefined}
               ref={!message.isUser && index === messages.length - 1 ? latestBotMessageRef : null}
               style={{
                 display: 'flex',
-                alignItems: 'center',
                 justifyContent: message.isUser ? 'flex-end' : 'flex-start',
                 marginBottom: '10px'
               }}
@@ -507,23 +505,17 @@ function Chat() {
                     message.text
                   )}
                 </div>
+                {/* inside the relative wrapper: the circles pin to the bubble's corners,
+                    same as the "?" badge above */}
+                {message.link && (
+                  <Rating
+                    value={message.rating}
+                    onRate={(r) => rate(index, message.link!, r)}
+                  />
+                )}
               </div>
-              {message.link && (
-                <Rating
-                  value={message.rating}
-                  onRate={(r) => rate(index, message.link!, r)}
-                />
-              )}
             </div>
-          )).flatMap((el, index) => {
-            // The history stays on screen across games, so words legitimately repeat
-            // across this line. Mark the boundary or it just reads like a bug.
-            const divider = <div className="rts-newgame" key={`ng-${index}`}>new game</div>;
-            const msg = messages[index];
-            if (msg.newGameBefore) return [divider, el];
-            if (msg.newGameAfter) return [el, divider];
-            return [el];
-          })}
+          ))}
           <div ref={messagesEndRef} />
         </div>
         <form

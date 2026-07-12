@@ -1,11 +1,4 @@
-spellcheck
-new libraries
-rts database
-definition
-justification
 like, dislike
-ai
 voice chat
-voice model
-
-dark mode, only rts
+spellcheck
+rts database
