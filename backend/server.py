@@ -13,7 +13,20 @@ from flask_cors import CORS
 
 load_dotenv()  # pull ANTHROPIC_API_KEY (and anything else) from backend/.env
 
-import engine  # noqa: E402  (import after load_dotenv so the client sees the key)
+# In production (App Engine) there is no .env — pull the key from Secret Manager.
+# GOOGLE_CLOUD_PROJECT is set automatically on App Engine and absent locally, so
+# local dev skips this entirely and keeps using .env.
+if not os.environ.get("ANTHROPIC_API_KEY") and os.environ.get("GOOGLE_CLOUD_PROJECT"):
+    from google.cloud import secretmanager
+
+    _project = os.environ["GOOGLE_CLOUD_PROJECT"]
+    _sm = secretmanager.SecretManagerServiceClient()
+    _name = f"projects/{_project}/secrets/anthropic-api-key/versions/latest"
+    os.environ["ANTHROPIC_API_KEY"] = (
+        _sm.access_secret_version(name=_name).payload.data.decode("utf-8")
+    )
+
+import engine  # noqa: E402  (import after the key is in env so the client sees it)
 
 app = Flask(__name__)
 

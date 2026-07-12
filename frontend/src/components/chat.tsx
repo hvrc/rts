@@ -29,7 +29,7 @@ interface ServerResponse {
 function Chat() {
   const API_URL = import.meta.env.PROD 
     ? 'https://backend-dot-rts0-462101.ue.r.appspot.com'
-    : 'http://localhost:5000';
+    : 'http://localhost:5001';
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
