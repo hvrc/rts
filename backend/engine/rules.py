@@ -43,6 +43,18 @@ class LetterRule:
     def name(self):
         return "reversed" if self.reverse else "normal"
 
+    def allowed_letters(self):
+        """The letters a legal word may start with, spelled out.
+
+        Telling the model to "think harder" doesn't work — it fixates on the banned
+        letters it already thought of (loud -> sound/siren/scream/shout, all "s") and
+        concedes. Handing it the letters it CAN use turns a vague nudge into a concrete
+        constraint it can actually search against.
+        """
+        if self.reverse:
+            return list(RTS_LETTERS)
+        return [c for c in "abcdefghijklmnopqrstuvwxyz" if c not in RTS_LETTERS]
+
 
 def is_single_word(text):
     """A move is a single run of letters. Anything else is chat, not a move."""

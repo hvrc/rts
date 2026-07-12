@@ -96,11 +96,29 @@ def play(player_input, game_id=SOLO_ID, reverse=False, preferences=None):
         code = data.get("response_code", "INVALID")
         reply = (data.get("response") or "").strip()
 
+    # Conceding hands the human a win, and it gives up too easily — "loud" got a concede
+    # when noise/siren/drum/echo were all sitting right there. Make it look once more
+    # before a surrender is accepted. A genuine corner survives a second look.
+    if code == "CONCEDE":
+        letters = " ".join(rule.allowed_letters())
+        try:
+            data = _ask(game, text, taste=taste, spent=spent,
+                        correction="you are probably NOT cornered. Your word may start "
+                                   f"with any of these letters: {letters}. Go through them "
+                                   "and find a related word that starts with one — walk "
+                                   "the alphabet if you have to. If no association works, "
+                                   "try a looser leap, then the opposite. Only concede if "
+                                   "every single one of them breaks the rule.")
+        except Exception as e:
+            return contract.error(e)
+        code = data.get("response_code", "CONCEDE")
+        reply = (data.get("response") or "").strip()
+
     # --- the human asked to start over, or asked the AI to open ---
     if code == "RESTART":
         return _restart(game_id, rule, data, reply)
 
-    # --- the AI is cornered: it loses, and the game restarts ---
+    # --- genuinely cornered, twice over: it loses, and the game restarts ---
     if code == "CONCEDE":
         return _lose(game_id, rule, "CONCEDE", reply or "ok, you got me. new game — go")
 
