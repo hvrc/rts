@@ -83,16 +83,13 @@ function Chat() {
 
   // Flipping the rule does not restart the game — the chain survives, and the new rule
   // governs every word from here on. The bot just says so.
-  // Announce outside the state updater: StrictMode invokes updaters twice, so queuing
-  // the message in there posts it twice.
-  const toggleReverse = useCallback(() => {
-    const next = !reverse;
-    setReverse(next);
-    setMessages(m => [...m, {
-      text: next ? 'flipped. rts words only now' : 'back to normal. no rts',
-      isUser: false,
-    }]);
-  }, [reverse]);
+  // The AI calls the flip. Announce outside the state updater — StrictMode invokes
+  // updaters twice, which would post the line twice.
+  const toggleReverse = useCallback(async () => {
+    setReverse(prev => !prev);
+    setMessages(m => [...m, { text: '', isUser: false }]);
+    await animateText('new rules...');   // typed out like any other thing it says
+  }, []);
 
   const toggleTheme = useCallback(() => {
     setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
