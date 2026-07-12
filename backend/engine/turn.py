@@ -63,15 +63,18 @@ def play(player_input, game_id=SOLO_ID, reverse=False, preferences=None):
     code = data.get("response_code", "INVALID")
     reply = (data.get("response") or "").strip()
 
-    # A bare word is ALWAYS a move. The model sometimes mislabels the opening word of a
-    # fresh chain as a request to start over — which would wipe the board and replay the
-    # human's own word back as the AI's opener, swallowing their move. Asking to restart
-    # takes a sentence; one word never does.
-    if code == "RESTART" and rules.is_single_word(text):
+    # A bare word is ALWAYS a move — including the first word of an empty chain. The
+    # model otherwise drifts into RESTART (wiping the board and replaying the human's own
+    # word back as its opener, swallowing the move) or CHAT ("you go first" — when they
+    # just did). Neither is a coherent answer to a single word, so don't accept them.
+    # INVALID stays allowed: a lone word can still be gibberish.
+    if rules.is_single_word(text) and code in ("RESTART", "CHAT"):
         try:
             data = _ask(game, text, taste=taste, spent=spent,
-                        correction="that was a plain word — it is a MOVE, not a request "
-                                   "to start over. Do not use RESTART.")
+                        correction="the human played a single word — that is a MOVE, not "
+                                   "chat and not a request to start over. They have gone "
+                                   "first. Answer with OK, UNRELATED, DUPLICATE or "
+                                   "CONCEDE.")
         except Exception as e:
             return contract.error(e)
         code = data.get("response_code", "INVALID")
