@@ -2,9 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <!-- viewport-fit=cover is what lets the page paint under the notch and the home
+         indicator. Without it iOS Safari keeps those bands outside the viewport
+         entirely and fills them with its own white canvas, which is the white
+         above and below the wallpaper. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <link rel="icon" type="image/png" href="/public/icon.png">
+    <!-- Tints Safari's own chrome to match, so the toolbar doesn't sit as a bright
+         slab under a dark window. -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#b9bed9" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#7f7a5c" />
+    <!-- public/ is the web root, so the served path has no /public prefix. Vite warns
+         about this on every build; in production the old path is simply a 404. -->
+    <link rel="icon" type="image/png" href="/icon.png">
     <title>r t s</title>
   </head>
   <body>

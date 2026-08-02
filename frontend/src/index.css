@@ -106,8 +106,19 @@ html, body {
   position: fixed;
   width: 100%;
   touch-action: none;
-  background-color: var(--bg);
+  /* The backdrop colour, not --bg. This is the canvas behind everything, and on iOS it
+     is what shows in the safe areas for the instant before the wallpaper paints - the
+     sampled colour blends into the image, plain white did not. */
+  background-color: var(--backdrop);
   transition: background-color 0.25s ease;
+}
+
+/* Dynamic viewport units where they exist: iOS reports a different height depending on
+   whether Safari's toolbar is expanded, and `100%` resolves against whichever it was at
+   load. `dvh` tracks it, so nothing uncovers when the toolbar collapses on scroll. */
+@supports (height: 100dvh) {
+  html, body { height: 100dvh; }
+  #root { height: 100dvh; }
 }
 
 /* The wallpaper.
@@ -129,7 +140,14 @@ html, body {
 body::before {
   content: '';
   position: fixed;
-  inset: 0;
+  /* Deliberately oversized rather than `inset: 0`. A fixed element pinned to the
+     viewport still leaves a hairline when iOS rounds the safe-area insets during a
+     toolbar transition; bleeding past every edge means there is nothing to uncover.
+     `cover` centres the image, so the overhang costs no visible framing. */
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
   z-index: 0;
   background-color: var(--backdrop);
   background-image: url('/wallpaper-light.jpg');

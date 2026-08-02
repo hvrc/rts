@@ -21,9 +21,17 @@ export function isDarkModePreference(v: string | null): v is DarkModePreference 
   return v === 'system' || v === 'light' || v === 'dark';
 }
 
+/**
+ * Light unless told otherwise.
+ *
+ * `system` is still a first-class choice and still follows the OS when picked - it is
+ * just no longer what an unconfigured visitor gets. Most phones sit in dark mode by
+ * schedule rather than by preference, so defaulting to `system` meant the game opened
+ * dark for people who had never expressed an opinion about this game.
+ */
 export function initialDarkPreference(): DarkModePreference {
   const saved = localStorage.getItem(DARK_MODE_KEY);
-  return isDarkModePreference(saved) ? saved : 'system';
+  return isDarkModePreference(saved) ? saved : 'light';
 }
 
 export function systemPrefersDark(): boolean {
