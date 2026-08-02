@@ -4,8 +4,14 @@ Swapping the brain is a config change, not a code change:
 
   # Anthropic (default)
   RTS_PROVIDER=anthropic
-  RTS_MODEL=claude-haiku-4-5
+  RTS_MODEL=claude-sonnet-5
   ANTHROPIC_API_KEY=sk-ant-...
+
+  # Cheaper and faster, at the cost of the judgment calls. Haiku rejects both the
+  # effort and thinking parameters, so blank them out.
+  RTS_MODEL=claude-haiku-4-5
+  RTS_EFFORT=
+  RTS_THINKING=
 
   # Anything speaking the OpenAI chat-completions API — local or hosted.
   # Ollama, LM Studio, vLLM, llama.cpp, Together, Groq, OpenRouter, ...
@@ -21,13 +27,22 @@ Swapping the brain is a config change, not a code change:
 import os
 
 PROVIDER = os.environ.get("RTS_PROVIDER", "anthropic").strip().lower()
-MODEL = os.environ.get("RTS_MODEL", "claude-haiku-4-5").strip()
-MAX_TOKENS = int(os.environ.get("RTS_MAX_TOKENS", "1024"))
+MODEL = os.environ.get("RTS_MODEL", "claude-sonnet-5").strip()
+
+# Covers thinking AND the reply, so it can't be sized against the reply alone. The bubble
+# text is tiny; the headroom here is for the reasoning behind it.
+MAX_TOKENS = int(os.environ.get("RTS_MAX_TOKENS", "4096"))
 
 # OpenAI-compatible providers only.
 BASE_URL = (os.environ.get("RTS_BASE_URL") or "").rstrip("/")
 API_KEY = os.environ.get("RTS_API_KEY", "")
 
-# Anthropic only. Leave unset for Haiku 4.5 — it rejects the effort parameter with a
-# 400. Set to low/medium/high if you swap to a model that supports it (Sonnet 5, Opus).
-EFFORT = (os.environ.get("RTS_EFFORT") or "").strip() or None
+# Anthropic only. low | medium | high | xhigh | max. Judging relatedness is the hard part
+# of a turn, so this is the main quality dial — but the reply still has to arrive while
+# someone is watching a typing indicator, which is why the default isn't higher.
+EFFORT = (os.environ.get("RTS_EFFORT") or "medium").strip() or None
+
+# Anthropic only. "adaptive" or "disabled". Adaptive is also the default on Sonnet 5 and
+# Opus 5 when omitted, so this mostly exists to turn thinking OFF for a cheap model.
+# Haiku 4.5 rejects both this and EFFORT — set RTS_THINKING= and RTS_EFFORT= for it.
+THINKING = (os.environ.get("RTS_THINKING") or "adaptive").strip() or None

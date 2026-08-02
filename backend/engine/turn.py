@@ -23,7 +23,22 @@ from .state import GAMES, SOLO_ID
 
 
 def play(player_input, game_id=SOLO_ID, reverse=False, preferences=None):
-    """Handle one /echo turn. Returns the frozen contract dict."""
+    """Handle one /echo turn. Returns the frozen contract dict.
+
+    Both sides of the exchange are recorded afterwards, not before: the prompt already
+    carries the human's current message in its own block, so remembering it up front
+    would send it twice. A loss or restart mid-turn swaps the Game object, hence the
+    re-fetch — the transcript survives that swap, the board doesn't.
+    """
+    payload = _play(player_input, game_id, reverse, preferences)
+
+    game = GAMES.get(game_id)
+    game.remember("user", (player_input or "").strip())
+    game.remember("assistant", payload.get("response", ""))
+    return payload
+
+
+def _play(player_input, game_id, reverse, preferences):
     game = GAMES.get(game_id)
     taste = Preferences.from_payload(preferences)
 
@@ -63,22 +78,12 @@ def play(player_input, game_id=SOLO_ID, reverse=False, preferences=None):
     code = data.get("response_code", "INVALID")
     reply = (data.get("response") or "").strip()
 
-    # A bare word is ALWAYS a move — including the first word of an empty chain. The
-    # model otherwise drifts into RESTART (wiping the board and replaying the human's own
-    # word back as its opener, swallowing the move) or CHAT ("you go first" — when they
-    # just did). Neither is a coherent answer to a single word, so don't accept them.
-    # INVALID stays allowed: a lone word can still be gibberish.
-    if rules.is_single_word(text) and code in ("RESTART", "CHAT"):
-        try:
-            data = _ask(game, text, taste=taste, spent=spent,
-                        correction="the human played a single word — that is a MOVE, not "
-                                   "chat and not a request to start over. They have gone "
-                                   "first. Answer with OK, UNRELATED, DUPLICATE or "
-                                   "CONCEDE.")
-        except Exception as e:
-            return contract.error(e)
-        code = data.get("response_code", "INVALID")
-        reply = (data.get("response") or "").strip()
+    # The single-word override that used to live here is gone. It forced any one-word
+    # message to be a move, because without conversation history the model had no way to
+    # tell "bro" opening a game from "what" answering a question — so it guessed, badly,
+    # and this rule overruled it whichever way it guessed. The model can see the
+    # transcript now, which is the actual fix; forcing the answer on top of that would
+    # just reintroduce the bug it was papering over.
 
     # Veto a bogus duplicate call. Repeating is a losing move now, so a model that
     # mistakes a synonym for a repeat ("win's basically victory") ends the game on a
@@ -96,23 +101,12 @@ def play(player_input, game_id=SOLO_ID, reverse=False, preferences=None):
         code = data.get("response_code", "INVALID")
         reply = (data.get("response") or "").strip()
 
-    # Conceding hands the human a win, and it gives up too easily — "loud" got a concede
-    # when noise/siren/drum/echo were all sitting right there. Make it look once more
-    # before a surrender is accepted. A genuine corner survives a second look.
-    if code == "CONCEDE":
-        letters = " ".join(rule.allowed_letters())
-        try:
-            data = _ask(game, text, taste=taste, spent=spent,
-                        correction="you are probably NOT cornered. Your word may start "
-                                   f"with any of these letters: {letters}. Go through them "
-                                   "and find a related word that starts with one — walk "
-                                   "the alphabet if you have to. If no association works, "
-                                   "try a looser leap, then the opposite. Only concede if "
-                                   "every single one of them breaks the rule.")
-        except Exception as e:
-            return contract.error(e)
-        code = data.get("response_code", "CONCEDE")
-        reply = (data.get("response") or "").strip()
+    # A concede used to be second-guessed here, on the grounds that the bot gave up too
+    # easily. That was true of a model reasoning with thinking switched off, and the retry
+    # made it worse in a subtler way: conceding became so expensive that the bot would
+    # rather play a word it couldn't defend. Losing honestly is cheaper than that, and the
+    # prompt now says so. If it starts folding early again, raise RTS_EFFORT — that's the
+    # dial for "think harder before giving up", not a second round-trip.
 
     # --- the human asked to start over, or asked the AI to open ---
     if code == "RESTART":
@@ -146,8 +140,14 @@ def play(player_input, game_id=SOLO_ID, reverse=False, preferences=None):
                 return _lose(game_id, rule, "CONCEDE", "ok, you got me. new game — go")
 
         # --- 4. legal both ways: advance the chain ---
-        played = text.lower()
-        game.add(played)
+        # What they *played*, not what they typed. Falls back to the raw text only when
+        # the model didn't name a word, and skips it entirely if that fallback isn't a
+        # bare word — better a gap in the chain than "how?" sitting in it as a move.
+        played = _clean(data.get("their_word")) or text.lower()
+        if rules.is_single_word(played):
+            game.add(played)
+        else:
+            played = game.last_word
         game.add(chosen)
         tot = contract.clean_train_of_thought(data.get("train_of_thought", []), chosen, rule)
         # The link is what the human rates: "from this word, the AI leapt to that one".
@@ -194,7 +194,7 @@ def _ask(game, player_input, correction=None, taste=None, spent=None):
     ctx = TurnContext(game.rule, spent or game.used, game.chain, game.last_word)
     return get_provider().move(
         prompts.system_prompt(game.rule),
-        prompts.turn_message(game, player_input, correction, taste),
+        prompts.messages(game, player_input, correction, taste),
         ctx,
     )
 

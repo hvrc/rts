@@ -16,7 +16,7 @@ _POOL = [
 class StubProvider(Provider):
     name = "stub"
 
-    def move(self, system_prompt, user_message, ctx):
+    def move(self, system_prompt, messages, ctx):
         pick = next(
             (w for w in _POOL if ctx.rule.allows(w) and w not in ctx.used),
             "",

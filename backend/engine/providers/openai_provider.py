@@ -51,14 +51,14 @@ class OpenAIProvider(Provider):
         with urllib.request.urlopen(req, timeout=60) as r:
             return json.load(r)
 
-    def move(self, system_prompt, user_message, ctx=None):
+    def move(self, system_prompt, messages, ctx=None):
         # ctx is unused: the rule and the board are already spelled out in the prompt.
         base = {
             "model": self.model,
             "max_tokens": self.max_tokens,
             "messages": [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message},
+                *messages,
             ],
         }
 
@@ -72,7 +72,7 @@ class OpenAIProvider(Provider):
             {**base, "response_format": {"type": "json_object"}},
             {**base, "messages": [
                 {"role": "system", "content": system_prompt + _JSON_NUDGE},
-                {"role": "user", "content": user_message},
+                *messages,
             ]},
         ]
 
