@@ -95,8 +95,17 @@
     inset 0 0 0 1px rgba(255, 255, 255, 0.09);
 }
 
-/* The composer sits on the panel - no bar, no rule above it. The pill is enough
-   to say where the input is; a divider on top of glass just reads as a seam. */
+/* There are no bars - only controls floating in front of the conversation.
+
+   The top and bottom strips have no fill of their own and no blur: the traffic lights,
+   the input pill and the send button each carry their own, and a bubble simply passes
+   behind them and is clipped by the window's rounded edge, which is the only thing in
+   the window that cuts anything.
+
+   Every intermediate version of this - an opaque bar, a veil, a blur - was a way of
+   hiding the bubble before it reached the edge. None of them were needed once the
+   strips stopped being part of the layout. */
+:root[data-skin='aqua'] .rts-header-group,
 :root[data-skin='aqua'] .rts-composer {
   background: transparent;
   box-shadow: none;
@@ -205,6 +214,47 @@
   );
 }
 
+/* The player's own bubble in dark mode: dimmed enough for the gloss to read, but still
+   obviously theirs.
+
+   Brand orange at full strength was the one fill that never dimmed, and the shine is
+   white at low alpha - on a bright saturated fill there is nothing for a highlight to
+   sit against, so the bubble kept its colour and lost the material the rest of the
+   window is made of.
+
+   ryOS's own value for this (#423d33) does not work here, and the reason is worth
+   keeping: their bot bubble is cool (#353a42), so a warm graphite reads as clearly
+   different. Ours takes its hue from the accent, and the dark wallpaper samples to gold
+   - which put the bot at #424035 and the player at #423d33, two points apart. Identical
+   bubbles.
+
+   So the tint is mixed from the brand colour itself rather than picked as a fixed
+   graphite: 16% of #ffac1c into a dark neutral gives #534021, amber enough to be
+   unmistakably the player's side at a glance and dark enough that the shine still
+   lands. Being derived from the var rather than hardcoded, it also follows the brand if
+   that ever changes.
+
+   Named rather than repeated, because the send button wears the same fill: they are the
+   two surfaces that represent the player, and a hardcoded hex in each is two places to
+   remember when the brand moves. The var it mixes from is left alone - light mode still
+   reads full-strength orange from it. */
+:root[data-skin='aqua'][data-theme='dark'] {
+  --brand-dimmed: color-mix(in srgb, var(--bubble-user-bg) 16%, #322c22);
+}
+
+:root[data-skin='aqua'][data-theme='dark'] .rts-bubble.is-user {
+  background-color: var(--brand-dimmed);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+/* The send button is the player's control, so it dims with the player's bubble rather
+   than staying a bright orange dot on a dark window. It keeps its Aqua gloss and rim,
+   which is what still marks it as a button. */
+:root[data-skin='aqua'][data-theme='dark'] .rts-send {
+  background-color: var(--brand-dimmed);
+  color: rgba(255, 255, 255, 0.92);
+}
+
 /* --- The composer -------------------------------------------------------- */
 
 /* The pill is edges only - no fill of its own. A darker well would read as a
@@ -214,9 +264,17 @@
    blurred the wallpaper once already, and blurring the result again just dims
    it without adding anything. */
 :root[data-skin='aqua'] .rts-input {
-  background-color: transparent;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+  /* The panel's own fill plus a blur of its own - the one place in the window that
+     still frosts anything.
+
+     It reads as the same surface the pill sits on, which is what you want looking at
+     it, but unlike `transparent` it is a real fill, so a bubble scrolling past goes
+     *behind* the input rather than through the middle of it. The blur is what keeps
+     that readable: without it the bubble's text would be legible through the field you
+     are typing into. */
+  background-color: var(--glass-panel);
+  -webkit-backdrop-filter: blur(8px) saturate(1.3);
+  backdrop-filter: blur(8px) saturate(1.3);
   border-color: transparent;
   border-radius: 999px;
   box-shadow:

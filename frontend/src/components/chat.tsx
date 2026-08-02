@@ -23,6 +23,10 @@ interface Message {
 
   // An empty bot bubble holding the bot's place while it thinks. Renders as the dots.
   pending?: boolean;
+
+  // Set once streamed text starts arriving in that bubble: still pending (the turn
+  // isn't settled), but no longer showing dots.
+  streaming?: boolean;
 }
 
 interface WordState {
@@ -45,6 +49,53 @@ interface ServerResponse {
 }
 
 type Skin = 'aqua' | 'flat';
+
+/**
+ * Read one turn off the server-sent event stream.
+ *
+ * Two event types: `delta` carries more of the reply and is handed to `onDelta` the
+ * moment it lands; `done` carries the same payload the old non-streaming endpoint
+ * returned, which is what the rest of this component still works from. A turn whose
+ * provider cannot stream simply produces no deltas and one `done` - the caller cannot
+ * tell the difference except by when the text shows up.
+ */
+async function readTurn(
+  body: ReadableStream<Uint8Array>,
+  onDelta: (text: string) => void,
+): Promise<ServerResponse | null> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let result: ServerResponse | null = null;
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    // Frames are separated by a blank line. A chunk can split one anywhere, so only
+    // whole frames are consumed and the remainder stays in the buffer.
+    let split = buffer.indexOf('\n\n');
+    for (; split !== -1; split = buffer.indexOf('\n\n')) {
+      const frame = buffer.slice(0, split);
+      buffer = buffer.slice(split + 2);
+
+      let event = 'message';
+      let payload = '';
+      for (const line of frame.split('\n')) {
+        if (line.startsWith('event: ')) event = line.slice(7).trim();
+        else if (line.startsWith('data: ')) payload += line.slice(6);
+      }
+      if (!payload) continue;
+
+      const parsed = JSON.parse(payload);
+      if (event === 'delta') onDelta(parsed as string);
+      else if (event === 'done') result = parsed as ServerResponse;
+    }
+  }
+
+  return result;
+}
 
 const SKIN_KEY = 'rts.skin';
 
@@ -71,6 +122,11 @@ const MIN_HEIGHT = 220;
 
 /** The eight resize handles: each letter is a side that the drag moves. */
 const RESIZE_EDGES = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'] as const;
+
+/** Milliseconds a character waits before the next one appears. */
+const TYPE_MS = 18;
+
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /** `?skin=flat` wins over the stored preference - one URL to compare the two. */
 function initialSkin(): Skin {
@@ -104,8 +160,6 @@ function Chat() {
   const [isAnimating, setIsAnimating] = useState(false);
   const [serverData, setServerData] = useState<ServerResponse | null>(null);
   const [isTyping, setIsTyping] = useState(false);
-  const [animatedText, setAnimatedText] = useState("");
-  const [isTextAnimating, setIsTextAnimating] = useState(false);
   const [lastProcessedMessage, setLastProcessedMessage] = useState<string | null>(null);
 
   // Which bot message has been tapped open. Touch has no hover, so the thumbs need a
@@ -296,6 +350,32 @@ function Chat() {
     localStorage.setItem(ACCENT_KEY, accent);
   }, [accent, isDark, wallpaperAccent]);
 
+  /**
+   * Measure the floating bars so the conversation can be padded clear of them.
+   *
+   * The top bar is not a fixed height - it grows when the appearance strip opens - so
+   * this observes both bars rather than hardcoding an inset that would be wrong half
+   * the time.
+   */
+  useEffect(() => {
+    const win = windowRef.current;
+    if (!win) return;
+    const header = win.querySelector<HTMLElement>('.rts-header-group');
+    const composer = win.querySelector<HTMLElement>('.rts-composer');
+    if (!header || !composer) return;
+
+    const sync = () => {
+      win.style.setProperty('--chrome-top', `${header.offsetHeight}px`);
+      win.style.setProperty('--chrome-bottom', `${composer.offsetHeight}px`);
+    };
+    sync();
+
+    const observer = new ResizeObserver(sync);
+    observer.observe(header);
+    observer.observe(composer);
+    return () => observer.disconnect();
+  }, []);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -312,9 +392,9 @@ function Chat() {
     const next = !reverse;
     setReverse(next);
     setMessages(m => [...m, { text: '', isUser: false }]);
-    await animateText(
+    await announce(
       next
-        ? "new rules... every word has to START with r, t or s now. anything else and you're out"
+        ? "new rules... every word has to start with r t or s now, no other letters allowed"
         : "new rules... back to normal. no word can start with r, t or s"
     );
   }, [reverse]);
@@ -343,6 +423,23 @@ function Chat() {
    * flight, so land on it rather than appending - otherwise the dots would linger above
    * the answer.
    */
+  /**
+   * Show `text` in the waiting bubble.
+   *
+   * The placeholder keeps its `pending` flag so `settlePending` can still find it when
+   * the turn finishes, but it stops rendering the thinking dots as soon as there is a
+   * character to show - the dots and the answer would otherwise share the bubble.
+   */
+  const setPendingText = useCallback((text: string) => {
+    setMessages(prev => {
+      const next = [...prev];
+      const at = next.map(m => !!m.pending).lastIndexOf(true);
+      if (at === -1) return prev;
+      next[at] = { ...next[at], text, streaming: true };
+      return next;
+    });
+  }, []);
+
   const settlePending = useCallback((botMessage: Message, flagUnrelated = false) => {
     setMessages(prev => {
       const next = [...prev];
@@ -379,7 +476,7 @@ function Chat() {
     setInputText('');
 
     try {
-      const response = await fetch(`${API_URL}/echo`, {
+      const response = await fetch(`${API_URL}/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -389,12 +486,47 @@ function Chat() {
           game_id: gameId(),
           reverse: reverseRef.current,
           preferences: loadPrefs(),   // taste travels with every turn
+          // The train of thought is the largest thing the model writes and it is only
+          // ever drawn when `s` is on. Asking for it regardless was roughly tripling
+          // the turn to generate an animation nobody would see.
+          thoughts: showThoughtProcess,
         }),
       });
 
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response.ok || !response.body) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-      const data: ServerResponse = await response.json();
+      /* The reply types itself out, but against a buffer the stream is still filling
+         rather than against a finished string.
+
+         The old typewriter ran after the whole response had arrived, so its cost was
+         added to the wait: fifty milliseconds a character on top of an answer that
+         already existed. This one starts as soon as the first characters land and
+         stops when it catches up, so on a one-word reply it is a brief flourish and on
+         a long one it is revealing text that is still being written anyway. */
+      const buffered = { text: '', complete: false };
+
+      const typing = (async () => {
+        let shown = 0;
+        for (;;) {
+          if (shown < buffered.text.length) {
+            shown += 1;
+            setPendingText(buffered.text.slice(0, shown));
+            await wait(TYPE_MS);
+          } else if (buffered.complete) {
+            return;
+          } else {
+            await wait(16);        // caught up; idle until more arrives
+          }
+        }
+      })();
+
+      const data = await readTurn(response.body, (text) => { buffered.text += text; });
+      buffered.complete = true;
+      await typing;
+
+      if (!data) throw new Error('stream ended without a result');
 
       // `link` is present only when the bot actually played a word, which is exactly
       // when there is something worth rating. `new_game` is deliberately not surfaced:
@@ -407,20 +539,11 @@ function Chat() {
       };
 
       settlePending(botMessage, data.response_code === 'UNRELATED');
+      setLastProcessedMessage(userInput);
 
       if (showThoughtProcess && data.train_of_thought && data.train_of_thought.length > 0 && userInput !== lastProcessedMessage) {
         setServerData(data);
         setIsTyping(true);
-        setLastProcessedMessage(userInput);
-      } else {
-        setIsTextAnimating(true);
-        setAnimatedText("");
-        for (let i = 0; i < data.response.length; i++) {
-          setAnimatedText(prev => prev + data.response[i]);
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
-        setIsTextAnimating(false);
-        setLastProcessedMessage(userInput);
       }
 
     } catch (error) {
@@ -449,25 +572,24 @@ function Chat() {
         'u start...',
       ];
 
+      // The intro keeps its typewriter. Nothing is waiting on it - the player has just
+      // arrived and there is no turn in flight - so the delay here buys the opening its
+      // pacing rather than costing anyone a reply. It types into the message itself now
+      // instead of through shared animation state, which the streamed replies retired.
       for (const message of welcomeMessages) {
         if (!mounted) break;
 
         setMessages(prev => [...prev, { text: "", isUser: false }]);
 
-        setIsTextAnimating(true);
-        setAnimatedText("");
         for (let i = 0; i < message.length; i++) {
           if (!mounted) break;
-          setAnimatedText(prev => prev + message[i]);
           await new Promise(resolve => setTimeout(resolve, 25));
+          setMessages(prev => {
+            const next = [...prev];
+            next[next.length - 1] = { ...next[next.length - 1], text: message.slice(0, i + 1) };
+            return next;
+          });
         }
-
-        setMessages(prev => {
-          const newMessages = [...prev];
-          newMessages[newMessages.length - 1].text = message;
-          return newMessages;
-        });
-        setIsTextAnimating(false);
 
         await new Promise(resolve => setTimeout(resolve, 100));
       }
@@ -558,7 +680,7 @@ function Chat() {
           await new Promise(resolve => setTimeout(resolve, 500));
           setIsTyping(false);
 
-          await animateText(messages[messages.length - 1].text);
+          await announce(messages[messages.length - 1].text);
 
           await new Promise(resolve => setTimeout(resolve, 300));
           setAnimatingWords(prev =>
@@ -580,24 +702,28 @@ function Chat() {
     };
   }, [serverData?.train_of_thought, showThoughtProcess]);
 
-  const animateText = async (text: string) => {
+  /**
+   * Put a locally-authored line into the empty bubble that was just pushed for it.
+   *
+   * This used to type the text out one character at a time. That made sense when every
+   * reply arrived complete and instantly - the typewriter was the only thing making a
+   * turn feel progressive. Now the bot's own replies stream from the server as they are
+   * written, so a per-character delay here is no longer a reveal, only a wait: at 25ms a
+   * character it was adding a second to a forty-character line that already existed in
+   * full. The two lines it still serves are the rule-flip announcement and the reset
+   * message, neither of which the player is waiting on.
+   */
+  const announce = async (text: string) => {
     if (!text) return;
-
-    setIsTextAnimating(true);
-    setAnimatedText("");
-
-    for (let i = 0; i < text.length; i++) {
-      setAnimatedText(prev => prev + text[i]);
-      await new Promise(resolve => setTimeout(resolve, 25));
+    for (let i = 1; i <= text.length; i++) {
+      setMessages(prev => {
+        const next = [...prev];
+        if (!next.length) return prev;
+        next[next.length - 1] = { ...next[next.length - 1], text: text.slice(0, i) };
+        return next;
+      });
+      await wait(TYPE_MS);
     }
-
-    setMessages(prev => {
-      const newMessages = [...prev];
-      newMessages[newMessages.length - 1].text = text;
-      return newMessages;
-    });
-
-    setIsTextAnimating(false);
   };
 
   return (
@@ -718,17 +844,17 @@ function Chat() {
                   </div>
                 )}
                 <div className={`rts-bubble${message.isUser ? ' is-user' : ''}`}>
-                  {/* thinking: while the request is in flight (any mode), and while the
-                      train of thought is still narrowing down to its pick */}
-                  {message.pending || (!message.isUser && index === messages.length - 1
-                                       && isTyping && showThoughtProcess) ? (
+                  {/* Dots while the request is in flight and while the train of thought
+                      is still narrowing down - but not once streamed text has started
+                      landing in this bubble, which replaces them. */}
+                  {(message.pending && !message.streaming)
+                   || (!message.isUser && index === messages.length - 1
+                       && isTyping && showThoughtProcess) ? (
                     <div className="typing-indicator">
                       <span></span>
                       <span></span>
                       <span></span>
                     </div>
-                  ) : (!message.isUser && index === messages.length - 1) ? (
-                    isTextAnimating ? animatedText : message.text
                   ) : (
                     message.text
                   )}

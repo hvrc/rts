@@ -131,21 +131,44 @@
 
 .rts-send:active { transform: scale(0.92); }
 
+/* The top bar and the composer float over the conversation rather than bracketing it.
+
+   They used to sit in the layout above and below the scroll area, which meant the
+   scroll area ended where they began - and a bubble crossing that line was sliced flat
+   across, mid-word. Lifting both out of the flow lets the messages run the full height
+   of the window, so the only thing that ever cuts a bubble is the window's own rounded
+   edge. Under the aqua skin the bars also blur what passes beneath them, which is what
+   makes them read as glass sitting on top rather than as walls.
+
+   Their heights are measured at runtime into --chrome-top / --chrome-bottom, because
+   the top bar grows when the appearance strip opens and a hardcoded inset would put the
+   first message underneath it. */
+.rts-header-group,
 .rts-composer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  background-color: var(--surface);
+  transition: background-color 0.25s ease;
+}
+
+.rts-header-group { top: 0; }
+.rts-composer {
+  bottom: 0;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 10px;
-  position: relative;
-  z-index: 3;
-  background-color: var(--surface);
-  transition: background-color 0.25s ease;
 }
 
 .messages-container {
   flex: 1;
   overflow-y: scroll;
-  padding: 10px;
+  /* Room for the bars to hover over, so a conversation at rest starts and ends clear
+     of them and only scrolls underneath when there is more than fits. */
+  padding: calc(var(--chrome-top, 43px) + 4px) 10px
+           calc(var(--chrome-bottom, 56px) + 4px);
   -ms-overflow-style: none;
   scrollbar-width: none;  /* Firefox */
 }
