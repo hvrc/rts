@@ -24,4 +24,11 @@ did not reveal.
 covers only appeared in a particular order: open the appearance panel, then open the
 lobby, which removes the composer and used to take the whole measurement down with it.
 
+Before deploying, run `npm run build`, not `vite build`. The two are not the same
+check: the real build is `tsc -b && vite build`, and `tsc -b` applies
+tsconfig.app.json - where `erasableSyntaxOnly` lives - while a bare `tsc --noEmit`
+reads the root config and a bare `vite build` uses esbuild, which strips types without
+looking at them. A constructor parameter property passed both of those and failed the
+deploy.
+
 They talk to a live model, so a full run takes a few minutes and costs tokens.

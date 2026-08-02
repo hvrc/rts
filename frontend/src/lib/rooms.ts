@@ -116,7 +116,14 @@ function rememberRoom(roomId: string, name: string) {
 }
 
 export class Rooms {
-  constructor(private api: string) {}
+  /* Declared and assigned rather than a `private api` constructor parameter: a
+     parameter property is TypeScript that has no JavaScript to erase to, and the
+     project builds with `erasableSyntaxOnly`. */
+  private api: string;
+
+  constructor(api: string) {
+    this.api = api;
+  }
 
   private async send(path: string, body?: unknown) {
     const response = await fetch(`${this.api}${path}`, {
