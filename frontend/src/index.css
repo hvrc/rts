@@ -35,33 +35,58 @@
   --logo-active-bg: #8b5cf6; /* purple = this toggle is on */
   --logo-active-text: #ffffff;
 
+  /* Overwritten inline on <html> by lib/accent.ts. These are the defaults for
+     the first paint, and they match the default blue accent. */
+  --accent: #2765ca;
+  --focus-ring: rgba(39, 101, 202, 0.3);
+  --accent-text: #2765ca;
+
+  /* Sampled from wallpaper-light.jpg - shown while it decodes. */
+  --backdrop: #b9bed9;
+
   color-scheme: light;
 }
 
+/* Dark neutrals are *neutral* - R, G and B within a couple of points of each
+   other. The original palette here leaned cool by 6 to 15 points (#14151a,
+   #26282f, #33363f, #8a9099), which is a deliberate-looking blue-gray on its
+   own but turns the whole window cold the moment it sits on a warm wallpaper.
+   ryOS keeps its dark grays at +2 to +5 (#1c1c1e, #3a3a3f) and lets the accent
+   supply any color, which is why theirs takes on the desktop instead of
+   fighting it. Same rule here. */
 :root[data-theme='dark'] {
-  --bg: #14151a;
-  --surface: #14151a;
+  --bg: #191919;
+  --surface: #191919;
 
-  --bubble-bot-bg: #26282f;
-  --bubble-bot-text: #e8e9ec;
+  --bubble-bot-bg: #3a3a3f;
+  --bubble-bot-text: #eaeaea;
   --bubble-user-bg: #ffac1c; /* the brand orange survives the theme */
   --bubble-user-text: #ffffff;
 
-  --input-bg: #1c1e24;
-  --input-text: #e8e9ec;
-  --input-border: #33363f;
+  --input-bg: #232324;
+  --input-text: #eaeaea;
+  --input-border: #3a3a3c;
 
-  --tot-text: #8a9099;
-  --typing-dot: #8a9099;
+  --tot-text: #949492;
+  --typing-dot: #949492;
 
-  --qm-bg: #3a3d45;
-  --qm-text: #b9bdc4;
+  --qm-bg: #3d3d3e;
+  --qm-text: #bcbcba;
 
   --logo-bg: #ffac1c;
   --logo-text: #ffffff;
   --logo-hover-bg: #efa219;
   --logo-active-bg: #a78bfa; /* a touch lighter so it reads against a dark field */
   --logo-active-text: #ffffff;
+
+  /* Pre-sample fallback. Neutral, not blue: this is what shows if the wallpaper
+     can't be sampled, and a stray blue is more wrong than a stray gray. */
+  --accent: #8a8a86;
+  --focus-ring: rgba(138, 138, 134, 0.45);
+  --accent-text: #c9c9c4;
+
+  /* Sampled from wallpaper-dark.jpg. */
+  --backdrop: #7f7a5c;
 
   color-scheme: dark;
 }
@@ -84,6 +109,43 @@ html, body {
   background-color: var(--bg);
   transition: background-color 0.25s ease;
 }
+
+/* The wallpaper.
+
+   This is what the glass is for. Frosted panels over a flat field look exactly
+   like a flat field - the blur needs something with variation behind it before
+   any of the panel or composer translucency is visible, and a real image gives
+   it far more to work with than a gradient did.
+
+   Two images, one per theme - the pale lavender for light, the olive for dark.
+   This is the honest version of what a brightness filter was faking: instead of
+   draining one picture until it's dim enough, each mode gets a picture that is
+   already right for it, and neither is distorted.
+
+   Both are 2560x1920 q82 JPEGs (~265 KB each) rather than the 3200x2400
+   originals; on images made entirely of soft gradients the difference isn't
+   visible. `--backdrop` is sampled from whichever is active so there's no flash
+   before it decodes. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-color: var(--backdrop);
+  background-image: url('/wallpaper-light.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+:root[data-theme='dark'] body::before {
+  background-image: url('/wallpaper-dark.jpg');
+}
+
+/* Still no filter on either image. ryOS never touches the wallpaper - dark mode
+   repaints the chrome and leaves the desktop alone. The panel is made dark by
+   raising its own fill, in skins/aqua.css. */
 
 #root {
   height: 100%;

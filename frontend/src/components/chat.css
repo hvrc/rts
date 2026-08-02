@@ -1,3 +1,147 @@
+/* ---------------------------------------------------------------------------
+   The flat skin - the original look, moved out of the inline styles in chat.tsx
+   so a skin has something to override. [data-skin='flat'] renders exactly what
+   this app rendered before skins existed.
+   --------------------------------------------------------------------------- */
+
+/* Once there's a wallpaper behind everything, the widget has to be a window -
+   a transparent 280px column pinned to the top-left corner over an image reads
+   as a rendering fault, not as a design. Both skins get a centered card; only
+   the material differs (opaque here, frosted in skins/aqua.css). */
+.rts-window {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25), 0 2px 6px rgba(0, 0, 0, 0.15);
+  transition: background 0.25s ease, box-shadow 0.25s ease;
+}
+
+/* No transition on position while dragging - the window has to track the
+   pointer exactly, and it lifts slightly so the drag reads as picked up. */
+.rts-window.is-dragging {
+  transition: none;
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.32), 0 3px 8px rgba(0, 0, 0, 0.2);
+}
+
+.rts-window.is-resizing { transition: none; }
+
+/* Resize handles. Invisible strips inside the window's own edges - inside,
+   because the window clips its overflow, so anything hanging outside would be
+   cut off and dead to the pointer. Corners are square and sit above the sides
+   so a diagonal drag wins over a straight one. */
+.rts-resize {
+  position: absolute;
+  z-index: 20;
+  touch-action: none;
+}
+
+.rts-resize--n, .rts-resize--s { left: 10px; right: 10px; height: 7px; cursor: ns-resize; }
+.rts-resize--e, .rts-resize--w { top: 10px; bottom: 10px; width: 7px; cursor: ew-resize; }
+.rts-resize--n { top: 0; }
+.rts-resize--s { bottom: 0; }
+.rts-resize--e { right: 0; }
+.rts-resize--w { left: 0; }
+
+.rts-resize--ne, .rts-resize--nw, .rts-resize--se, .rts-resize--sw {
+  width: 14px;
+  height: 14px;
+  z-index: 21;
+}
+.rts-resize--ne { top: 0; right: 0; cursor: nesw-resize; }
+.rts-resize--nw { top: 0; left: 0; cursor: nwse-resize; }
+.rts-resize--se { bottom: 0; right: 0; cursor: nwse-resize; }
+.rts-resize--sw { bottom: 0; left: 0; cursor: nesw-resize; }
+
+.rts-msg {
+  display: flex;
+  margin-bottom: 10px;
+}
+
+.rts-msg.is-user { justify-content: flex-end; }
+.rts-msg.is-bot  { justify-content: flex-start; }
+
+/* The relative wrapper the "?" badge and the rating thumbs hang off. They are
+   siblings of the bubble, not children, which is why a skin can safely put
+   `overflow: hidden` on the bubble without clipping them. */
+.rts-msg-body {
+  position: relative;
+  max-width: 100%;
+}
+
+.rts-bubble {
+  position: relative;
+  max-width: 100%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background-color: var(--bubble-bot-bg);
+  color: var(--bubble-bot-text);
+  transition: background-color 0.25s ease, color 0.25s ease,
+              box-shadow 0.25s ease, border-radius 0.25s ease;
+}
+
+.rts-bubble.is-user {
+  background-color: var(--bubble-user-bg);
+  color: var(--bubble-user-text);
+}
+
+.rts-input {
+  flex: 1;
+  /* Explicit height so the send button can be given the same one - matching a
+     circle to an implicitly-sized pill is guesswork that breaks the moment the
+     font size changes (and it does: 16px on mobile, 14px above 768px). */
+  height: 36px;
+  padding: 8px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--input-border);
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  touch-action: manipulation;
+  user-select: text;
+  transition: background-color 0.25s ease, color 0.25s ease,
+              border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.rts-send {
+  /* Smaller than the input and optically centred against it by `align-items`,
+     not by a hand-tuned margin - so it holds at either font size (16px on
+     mobile, 14px above 768px) instead of only looking right at one. */
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  outline: none;
+  border-radius: 50%;
+  cursor: pointer;
+  background-color: var(--bubble-user-bg);
+  color: var(--bubble-user-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  transition: background-color 0.25s ease, box-shadow 0.25s ease,
+              transform 0.1s ease;
+}
+
+.rts-send:active { transform: scale(0.92); }
+
+.rts-composer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  position: relative;
+  z-index: 3;
+  background-color: var(--surface);
+  transition: background-color 0.25s ease;
+}
+
 .messages-container {
   flex: 1;
   overflow-y: scroll;

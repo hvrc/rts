@@ -1,9 +1,18 @@
 import React from 'react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import './chat.css';
+import '../skins/aqua.css';
 import Header from './Header';
 import Rating from './Rating';
 import { gameId, loadPrefs, ratePair, type Link, type Rating as RatingValue } from '../lib/prefs';
+import { applyAccent, isAccentId, sampleWallpaperAccent, DEFAULT_ACCENT, type AccentId } from '../lib/accent';
+import {
+  DARK_MODE_KEY,
+  effectiveDark,
+  initialDarkPreference,
+  watchSystemDark,
+  type DarkModePreference,
+} from '../lib/darkMode';
 
 interface Message {
   text: string;
@@ -35,13 +44,48 @@ interface ServerResponse {
   new_game?: boolean;
 }
 
-type Theme = 'light' | 'dark';
+type Skin = 'aqua' | 'flat';
 
-const THEME_KEY = 'rts.theme';
+const SKIN_KEY = 'rts.skin';
 
-function initialTheme(): Theme {
-  const saved = localStorage.getItem(THEME_KEY);
-  return saved === 'dark' ? 'dark' : 'light'; // light is the original look; it stays the default
+/* Versioned on purpose. `rts.accent` was written as "blue" by an earlier build,
+   before `wallpaper` was an option - and a stored value beats a new default
+   forever, so every existing session stayed blue no matter what the default
+   became. Bumping the key retires those values instead of silently honouring a
+   choice the user never made. */
+const ACCENT_KEY = 'rts.accent.v2';
+
+/* One wallpaper per theme. The `wallpaper` accent samples whichever is showing,
+   so flipping the theme moves the accent with it. */
+const WALLPAPER_SRC = {
+  light: '/wallpaper-light.jpg',
+  dark: '/wallpaper-dark.jpg',
+} as const;
+
+/** Sampling costs a decode + a canvas read, so each image is only done once. */
+const wallpaperAccentCache = new Map<string, string>();
+
+/* Small enough to be useful, large enough that the composer never collapses. */
+const MIN_WIDTH = 240;
+const MIN_HEIGHT = 220;
+
+/** The eight resize handles: each letter is a side that the drag moves. */
+const RESIZE_EDGES = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'] as const;
+
+/** `?skin=flat` wins over the stored preference - one URL to compare the two. */
+function initialSkin(): Skin {
+  const param = new URLSearchParams(window.location.search).get('skin');
+  if (param === 'flat' || param === 'aqua') return param;
+  return localStorage.getItem(SKIN_KEY) === 'flat' ? 'flat' : 'aqua';
+}
+
+function initialAccent(): AccentId {
+  const param = new URLSearchParams(window.location.search).get('accent');
+  if (isAccentId(param)) return param;
+  const saved = localStorage.getItem(ACCENT_KEY);
+  if (isAccentId(saved)) return saved;
+  localStorage.removeItem('rts.accent'); // retire the pre-v2 value
+  return DEFAULT_ACCENT;
 }
 
 function Chat() {
@@ -70,13 +114,128 @@ function Chat() {
 
   // The three header toggles.
   const [showThoughtProcess, setShowThoughtProcess] = useState(false); // s
-  const [theme, setTheme] = useState<Theme>(initialTheme);             // t
   const [reverse, setReverse] = useState(false);                       // r
+
+  // Dark mode is a tri-state preference (`t`), resolved to a boolean for the DOM.
+  const [darkPref, setDarkPref] = useState<DarkModePreference>(initialDarkPreference);
+  const [isDark, setIsDark] = useState(() => effectiveDark(initialDarkPreference()));
+
+  // Appearance: the skin (shape + gloss) and the accent (hue). Separate axes
+  // from the theme, revealed by holding `t`.
+  const [skin, setSkin] = useState<Skin>(initialSkin);
+  const [accent, setAccent] = useState<AccentId>(initialAccent);
+  const [wallpaperAccent, setWallpaperAccent] = useState<string | null>(null);
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const latestBotMessageRef = useRef<HTMLDivElement>(null);
   const chatBoxRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const windowRef = useRef<HTMLDivElement>(null);
+
+  // Where the window has been dragged to. `null` means "still centered" - the
+  // CSS handles that case, and we only start writing left/top once the user has
+  // actually moved it, so resizing the viewport keeps re-centering until then.
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const [dragging, setDragging] = useState(false);
+
+  // Explicit size, once resized. `null` keeps the CSS defaults (280 wide, up to
+  // 480 tall) so the window still adapts to short viewports until it's touched.
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
+  const [resizing, setResizing] = useState(false);
+
+  const startDrag = useCallback((e: React.PointerEvent) => {
+    // The traffic lights and the appearance strip are controls, not handle.
+    if ((e.target as HTMLElement).closest('button')) return;
+    const el = windowRef.current;
+    if (!el) return;
+
+    const rect = el.getBoundingClientRect();
+    const grabX = e.clientX - rect.left;
+    const grabY = e.clientY - rect.top;
+    setDragging(true);
+
+    const move = (ev: PointerEvent) => {
+      // Keep at least a corner of the window on screen, so it can never be
+      // thrown somewhere it can't be grabbed back from.
+      const maxX = window.innerWidth - 60;
+      const maxY = window.innerHeight - 40;
+      setPos({
+        x: Math.min(Math.max(ev.clientX - grabX, 60 - rect.width), maxX),
+        y: Math.min(Math.max(ev.clientY - grabY, 0), maxY),
+      });
+    };
+
+    const end = () => {
+      setDragging(false);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+    };
+
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+  }, []);
+
+  /**
+   * Resize from any edge or corner. `edge` is a compass string ('n', 'se', ...);
+   * each letter names a side that moves, which keeps one handler for all eight
+   * instead of eight near-identical ones.
+   *
+   * Dragging a west or north edge moves the window as well as resizing it, so
+   * position and size are always set together - and the position is pinned on
+   * pointerdown, because the CSS centering would otherwise keep re-centering the
+   * window as it grew and the opposite edge would crawl away from the pointer.
+   */
+  const startResize = useCallback((edge: string) => (e: React.PointerEvent) => {
+    e.stopPropagation(); // don't also start a window drag
+    const el = windowRef.current;
+    if (!el) return;
+
+    const rect = el.getBoundingClientRect();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const from = { x: rect.left, y: rect.top, w: rect.width, h: rect.height };
+
+    setPos({ x: from.x, y: from.y });
+    setSize({ w: from.w, h: from.h });
+    setResizing(true);
+
+    const move = (ev: PointerEvent) => {
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+      let { x, y, w, h } = from;
+
+      if (edge.includes('e')) w = from.w + dx;
+      if (edge.includes('s')) h = from.h + dy;
+      if (edge.includes('w')) w = from.w - dx;
+      if (edge.includes('n')) h = from.h - dy;
+
+      w = Math.min(Math.max(w, MIN_WIDTH), window.innerWidth);
+      h = Math.min(Math.max(h, MIN_HEIGHT), window.innerHeight);
+
+      // Anchor the edge that isn't being dragged. Deriving x from the clamped
+      // width (rather than from dx) is what stops the far side sliding once the
+      // minimum is hit.
+      if (edge.includes('w')) x = from.x + from.w - w;
+      if (edge.includes('n')) y = from.y + from.h - h;
+
+      setSize({ w, h });
+      setPos({ x, y });
+    };
+
+    const end = () => {
+      setResizing(false);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+    };
+
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+  }, []);
 
   // `reverse` is read inside async handlers that would otherwise close over a stale
   // value; the ref always has the current one.
@@ -85,9 +244,57 @@ function Chat() {
 
   // Theme lives on <html> so index.css can drive every color from one attribute.
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem(THEME_KEY, theme);
-  }, [theme]);
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+  }, [isDark]);
+
+  // Preference -> resolved boolean, and persist the preference (not the result,
+  // so "system" stays "system" across reloads instead of freezing whatever the
+  // OS happened to be at the time).
+  useEffect(() => {
+    localStorage.setItem(DARK_MODE_KEY, darkPref);
+    setIsDark(effectiveDark(darkPref));
+  }, [darkPref]);
+
+  // Follow the OS while the preference is `system`; an explicit override wins.
+  useEffect(() => {
+    if (darkPref !== 'system') return;
+    return watchSystemDark(setIsDark);
+  }, [darkPref]);
+
+  // Sample the accent out of whichever wallpaper is showing. Re-runs on theme
+  // change, since the two images are different colors; cached so the second
+  // visit to a theme is instant. Until the first sample resolves, the
+  // `wallpaper` accent falls back to blue and its swatch shows a rainbow.
+  useEffect(() => {
+    const src = isDark ? WALLPAPER_SRC.dark : WALLPAPER_SRC.light;
+    const cached = wallpaperAccentCache.get(src);
+    if (cached) {
+      setWallpaperAccent(cached);
+      return;
+    }
+    let alive = true;
+    sampleWallpaperAccent(src).then((hex) => {
+      if (!hex) return;
+      wallpaperAccentCache.set(src, hex);
+      if (alive) setWallpaperAccent(hex);
+    });
+    return () => { alive = false; };
+  }, [isDark]);
+
+  // Same mechanism, second axis: the skin selects which stylesheet's rules win.
+  useEffect(() => {
+    document.documentElement.setAttribute('data-skin', skin);
+    localStorage.setItem(SKIN_KEY, skin);
+  }, [skin]);
+
+  // The accent is derived, not stored as a palette - one hex in, a handful of
+  // vars out. It depends on the theme because the same accent needs different
+  // math on a light window than on a dark one.
+  useEffect(() => {
+    applyAccent(accent, isDark, wallpaperAccent);
+    localStorage.setItem(ACCENT_KEY, accent);
+  }, [accent, isDark, wallpaperAccent]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -97,10 +304,10 @@ function Chat() {
     scrollToBottom();
   }, [messages]);
 
-  // Flipping the rule does not restart the game — the chain survives, and the new rule
+  // Flipping the rule does not restart the game - the chain survives, and the new rule
   // governs every word from here on. The bot just says so.
   // The AI calls the flip, and spells out what actually changed. Announce outside the
-  // state updater — StrictMode invokes updaters twice, which would post the line twice.
+  // state updater - StrictMode invokes updaters twice, which would post the line twice.
   const toggleReverse = useCallback(async () => {
     const next = !reverse;
     setReverse(next);
@@ -120,9 +327,12 @@ function Chat() {
     setMessages(m => m.map((msg, i) => (i === index ? { ...msg, rating } : msg)));
   }, []);
 
+  // Clicking `t` is the quick flip: it always lands on an explicit light/dark,
+  // never back on `system`. Choosing `system` is a deliberate act, done from the
+  // appearance strip - it shouldn't be something you cycle into by accident.
   const toggleTheme = useCallback(() => {
-    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
-  }, []);
+    setDarkPref(effectiveDark(darkPref) ? 'light' : 'dark');
+  }, [darkPref]);
 
   const toggleThoughts = useCallback(() => {
     setShowThoughtProcess(prev => !prev);
@@ -130,7 +340,7 @@ function Chat() {
 
   /**
    * Swap the waiting bubble for the real reply. The placeholder is the one message in
-   * flight, so land on it rather than appending — otherwise the dots would linger above
+   * flight, so land on it rather than appending - otherwise the dots would linger above
    * the answer.
    */
   const settlePending = useCallback((botMessage: Message, flagUnrelated = false) => {
@@ -138,7 +348,7 @@ function Chat() {
       const next = [...prev];
       const at = next.map(m => !!m.pending).lastIndexOf(true);
       if (at === -1) {
-        next.push(botMessage);       // no placeholder (shouldn't happen) — don't lose the reply
+        next.push(botMessage);       // no placeholder (shouldn't happen) - don't lose the reply
         return next;
       }
       next[at] = botMessage;
@@ -158,7 +368,7 @@ function Chat() {
     e.preventDefault();
     if (!inputText.trim()) return;
 
-    // The bot starts "thinking" the instant you hit send, in every mode — not only when
+    // The bot starts "thinking" the instant you hit send, in every mode - not only when
     // the train of thought is on.
     setMessages(prev => [
       ...prev,
@@ -215,7 +425,7 @@ function Chat() {
 
     } catch (error) {
       console.error('Error:', error);
-      // Settle, don't append — otherwise the dots spin forever above the "?".
+      // Settle, don't append - otherwise the dots spin forever above the "?".
       settlePending({ text: "?", isUser: false });
     }
   };
@@ -391,18 +601,45 @@ function Chat() {
   };
 
   return (
-    <div style={{
-      position: 'fixed',
-      width: '280px',
-      height: '100%',
-      maxHeight: '480px',
-      display: 'flex',
-      flexDirection: 'column',
-    }}>
+    <div
+      ref={windowRef}
+      className={`rts-window${dragging ? ' is-dragging' : ''}${resizing ? ' is-resizing' : ''}`}
+      style={{
+        position: 'fixed',
+        display: 'flex',
+        flexDirection: 'column',
+        // Untouched: 280 wide and as tall as fits, capped at 480. Once resized,
+        // both become explicit and the cap no longer applies.
+        width: size ? size.w : 280,
+        height: size ? size.h : '100%',
+        ...(size ? null : { maxHeight: 480 }),
+        // Once dragged, explicit coordinates replace the CSS centering.
+        ...(pos ? { left: pos.x, top: pos.y, transform: 'none' } : null),
+      }}
+    >
+      {RESIZE_EDGES.map((edge) => (
+        <div
+          key={edge}
+          className={`rts-resize rts-resize--${edge}`}
+          onPointerDown={startResize(edge)}
+        />
+      ))}
       <Header
         reverse={{ on: reverse, toggle: toggleReverse }}
-        theme={{ on: theme === 'dark', toggle: toggleTheme }}
+        theme={{ on: isDark, toggle: toggleTheme }}
         thoughts={{ on: showThoughtProcess, toggle: toggleThoughts }}
+        appearance={{
+          open: appearanceOpen,
+          toggleOpen: () => setAppearanceOpen((o) => !o),
+          skin,
+          setSkin,
+          accent,
+          setAccent,
+          wallpaperAccent,
+          darkPref,
+          setDarkPref,
+        }}
+        onDragStart={startDrag}
       />
       <div
         ref={chatBoxRef}
@@ -470,29 +707,17 @@ function Chat() {
             <div
               key={index}
               // `is-tapped` is what reveals the thumbs on touch, where there is no hover.
-              className={`rts-msg${tapped === index ? ' is-tapped' : ''}`}
+              className={`rts-msg ${message.isUser ? 'is-user' : 'is-bot'}${tapped === index ? ' is-tapped' : ''}`}
               onClick={message.link ? () => setTapped(t => (t === index ? null : index)) : undefined}
               ref={!message.isUser && index === messages.length - 1 ? latestBotMessageRef : null}
-              style={{
-                display: 'flex',
-                justifyContent: message.isUser ? 'flex-end' : 'flex-start',
-                marginBottom: '10px'
-              }}
             >
-              <div style={{ position: 'relative' }}>
+              <div className="rts-msg-body">
                 {message.isUser && message.showQuestionMark && (
                   <div className="question-mark-circle">
                     ?
                   </div>
                 )}
-                <div style={{
-                  maxWidth: '100%',
-                  padding: '8px 12px',
-                  borderRadius: '12px',
-                  backgroundColor: message.isUser ? 'var(--bubble-user-bg)' : 'var(--bubble-bot-bg)',
-                  color: message.isUser ? 'var(--bubble-user-text)' : 'var(--bubble-bot-text)',
-                  transition: 'background-color 0.25s ease, color 0.25s ease'
-                }}>
+                <div className={`rts-bubble${message.isUser ? ' is-user' : ''}`}>
                   {/* thinking: while the request is in flight (any mode), and while the
                       train of thought is still narrowing down to its pick */}
                   {message.pending || (!message.isUser && index === messages.length - 1
@@ -521,57 +746,15 @@ function Chat() {
           ))}
           <div ref={messagesEndRef} />
         </div>
-        <form
-          onSubmit={handleSubmit}
-          style={{
-            display: 'flex',
-            gap: '8px',
-            padding: '10px',
-            position: 'relative',
-            zIndex: 3,
-            backgroundColor: 'var(--surface)',
-            transition: 'background-color 0.25s ease'
-          }}
-        >
+        <form className="rts-composer" onSubmit={handleSubmit}>
           <input
+            className="rts-input"
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             placeholder=""
-            style={{
-              flex: 1,
-              padding: '8px 12px',
-              borderRadius: '20px',
-              border: '1px solid var(--input-border)',
-              backgroundColor: 'var(--input-bg)',
-              color: 'var(--input-text)',
-              outline: 'none',
-              fontSize: window.innerWidth <= 768 ? '16px' : '14px',
-              WebkitAppearance: 'none',
-              touchAction: 'manipulation',
-              userSelect: 'text',
-              transition: 'background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease'
-            }}
           />
-          <button
-            type="submit"
-            style={{
-              width: '25px',
-              height: '25px',
-              padding: 0,
-              borderRadius: '50%',
-              backgroundColor: 'var(--bubble-user-bg)',
-              color: 'var(--bubble-user-text)',
-              border: 'none',
-              outline: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginTop: '2px'
-            }}
-          >
-          </button>
+          <button className="rts-send" type="submit" aria-label="send" />
         </form>
       </div>
     </div>

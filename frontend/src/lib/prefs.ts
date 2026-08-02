@@ -1,7 +1,7 @@
 /**
  * Learned taste, and who you are.
  *
- * A rating is on a *link* — the leap the bot made (`from -> to`), not a bare word.
+ * A rating is on a *link* - the leap the bot made (`from -> to`), not a bare word.
  * Thumbs-up means "more leaps like that"; thumbs-down means "fewer". Both persist
  * across games, and ride along on every turn so the bot can weigh them.
  *

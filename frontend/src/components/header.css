@@ -1,54 +1,120 @@
-.rts-header {
-  display: flex;
-  justify-content: center;
+.rts-header-group {
   width: 100%;
-  padding: 8px 0 16px 0;
+  flex: none;
 }
 
+/* The logo is now the traffic lights: three small dots in the top-left corner,
+   red / amber / green, keeping their r / t / s letters as glyphs. The letter is
+   what makes them controls rather than decoration, so unlike the real thing it
+   stays visible instead of appearing only on hover. */
+.rts-header {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 12px 0 14px 12px;
+
+  /* The bar is the window's drag handle. `touch-action: none` keeps a touch
+     drag from being stolen by the browser's own pan gesture. */
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.rts-window.is-dragging .rts-header { cursor: grabbing; }
+
+/* The lights stay clickable - startDrag bails on any button target. */
+.rts-toggle { cursor: pointer; }
+
 .rts-toggle {
-  width: 30px;
-  height: 30px;
-  margin: 0 2px;
+  width: 17px;
+  height: 17px;
+  margin: 0;
   padding: 0;
   border: none;
   outline: none;
   border-radius: 50%;
   cursor: pointer;
+  flex: none;
 
   display: flex;
   align-items: center;
   justify-content: center;
 
   font-family: inherit;
-  font-size: 18px;
+  font-size: 11px;
+  font-weight: 600;
   line-height: 1;
 
-  background-color: var(--logo-bg);
-  color: var(--logo-text);
-  transition: background-color 0.25s ease, transform 0.1s ease;
+  /* Off is the same color, lightly drained - enough that lighting up still reads
+     as a change, but the row stays clearly red/amber/green at rest rather than
+     going pastel. (Was saturate(0.3): too washed to read as traffic lights.) */
+  filter: saturate(0.72) brightness(1.02);
+  transition: filter 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
 }
 
-/* the letters sat 2px high in the original logo — keep the optical centering */
+.rts-toggle.is-on { filter: saturate(1.1) brightness(1.06); }
+
+.rts-toggle:hover { filter: saturate(0.95) brightness(1.05); }
+.rts-toggle.is-on:hover { filter: saturate(1.2) brightness(1.12); }
+.rts-toggle:active { transform: scale(0.88); }
+
+.rts-toggle--r { background-color: #ff5f57; color: #6d0900; }
+.rts-toggle--t { background-color: #febc2e; color: #7a4c00; }
+.rts-toggle--s { background-color: #28c840; color: #005a12; }
+
 .rts-toggle > span {
-  margin-top: -2px;
-}
-
-.rts-toggle:hover {
-  background-color: var(--logo-hover-bg);
-}
-
-.rts-toggle:active {
-  transform: scale(0.92);
-}
-
-/* purple = on */
-.rts-toggle.is-on,
-.rts-toggle.is-on:hover {
-  background-color: var(--logo-active-bg);
-  color: var(--logo-active-text);
+  /* Optical centering for a lowercase glyph in a 17px circle. */
+  margin-top: -0.5px;
 }
 
 .rts-toggle:focus-visible {
-  outline: 2px solid var(--logo-active-bg);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The appearance strip - skin, then accent. Hidden until `t` is held, so the
+   logo keeps spelling "rts" and this stays out of the way until asked for. */
+.rts-appearance {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0 0 12px 0;
+  animation: rts-appearance-in 0.18s ease-out;
+}
+
+@keyframes rts-appearance-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.rts-skins {
+  display: flex;
+  gap: 4px;
+}
+
+.rts-skin {
+  padding: 3px 10px;
+  border: none;
+  outline: none;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--qm-text);
+  background-color: var(--qm-bg);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.rts-skin.is-on {
+  background-color: var(--accent);
+  color: #ffffff;
+}
+
+.rts-skin:focus-visible {
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }

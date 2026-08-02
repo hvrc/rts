@@ -8,8 +8,10 @@ function App() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: 'var(--bg)',
-      transition: 'background-color 0.25s ease',
+      // Transparent, not `var(--bg)`. This div covers the whole viewport, so an
+      // opaque fill here sits on top of the wallpaper on body::before and hides
+      // it completely. The window paints its own surface; the shell only centers.
+      backgroundColor: 'transparent',
       padding: window.innerWidth <= 400 ? '10px' : '0',
       overflow: 'hidden',
       position: 'fixed',

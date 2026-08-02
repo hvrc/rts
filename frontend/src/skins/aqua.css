@@ -1,0 +1,435 @@
+/* ---------------------------------------------------------------------------
+   Aqua Glass skin.
+
+   The glossy Mac OS X iChat bubble, adapted from ryOS (ryokun6/ryos -
+   src/styles/themes/aqua.css, dark-aqua.css, aqua-glass.css). Everything here is
+   scoped to [data-skin='aqua'], so the flat look in chat.css survives untouched
+   and this file can be deleted without editing a line of anything else.
+
+   Skin and theme are separate axes:
+
+       data-skin   aqua | flat      the shape and the gloss
+       data-theme  light | dark     the palette
+       data-accent blue | ...       the hue the bot's bubble follows
+
+   Four skin/theme combinations, all of which have to look deliberate.
+
+   One adaptation worth naming: in ryOS "glass" means a translucent window over a
+   desktop wallpaper. This app is a 280px widget on a flat field, and frosted
+   glass over flat white is just flat white - so the backdrop in index.css gives
+   the blur something to pick up. Without it the glass does nothing.
+   --------------------------------------------------------------------------- */
+
+:root[data-skin='aqua'] {
+  /* Bot bubble is overwritten by the accent at runtime; this is the fallback
+     for the first paint, and it matches the default blue accent. */
+  --bubble-bot-bg: #bfdbfe;
+  --bubble-bot-text: #000000;
+
+  /* Liquid glass, not frosted: the fill is nearly clear and the blur is light,
+     so the wallpaper stays legible *through* the panel - you can still read the
+     curve behind it. A heavy blur dissolves the image into a color wash, which
+     reads as plastic no matter how transparent the fill is. */
+  /* Tinted with the accent, the way ryOS builds its glass tokens
+     (`color-mix(in srgb, var(--os-accent-color) 8%, rgba(252,253,255,.8))`) -
+     the panel picks up a trace of the accent instead of being neutral white. */
+  --glass-panel: color-mix(in srgb, var(--accent) 10%, rgba(255, 255, 255, 0.12));
+  --glass-stroke: rgba(255, 255, 255, 0.7);
+  --glass-shadow: rgba(0, 0, 0, 0.22);
+  --glass-blur: blur(9px) saturate(1.4);
+}
+
+:root[data-skin='aqua'][data-theme='dark'] {
+  /* ryOS's own neutral graphite. Their pre-accent default is #353a42, which is
+     13 points cool - fine under their opaque chrome, wrong here. The accent
+     overwrites this inline anyway; it only shows before sampling finishes. */
+  --bubble-bot-bg: #3a3a3f;
+  --bubble-bot-text: rgba(255, 255, 255, 0.92);
+
+  /* Dark has to carry itself, because the wallpaper is no longer dimmed for it.
+     ryOS's dark glass sits at 0.8 alpha (`rgba(38,40,46,.8)` + 9% accent); 0.62
+     keeps more of the image visible while still reading as a dark panel over a
+     bright desktop. Below ~0.5 the wallpaper wins and it looks light.
+
+     The base is a *neutral* gray, not ryOS's `rgba(38,40,46)` - theirs is cool
+     (blue 8 points above red), which is invisible under an 0.8 fill but at 0.62
+     it fought the warm wallpaper and turned the panel blue. Neutral here means
+     the accent alone decides the temperature, which is the point of tinting. */
+  --glass-panel: color-mix(in srgb, var(--accent) 18%, rgba(32, 32, 33, 0.62));
+  --glass-stroke: rgba(255, 255, 255, 0.16);
+  --glass-shadow: rgba(0, 0, 0, 0.5);
+  --glass-blur: blur(9px) saturate(1.3);
+}
+
+/* --- The window ---------------------------------------------------------- */
+
+/* The whole widget becomes one frosted panel floating over the wallpaper, which
+   is what makes this read as a window rather than as a page. */
+:root[data-skin='aqua'] .rts-window {
+  background: var(--glass-panel);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border-radius: 18px;
+  box-shadow:
+    0 16px 40px var(--glass-shadow),
+    0 2px 6px rgba(0, 0, 0, 0.14),
+    /* the lit top edge, and a dimmer one on the underside - a pane of glass is
+       brightest where it catches light and darkest where it ends */
+    inset 0 1px 0 var(--glass-stroke),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+  overflow: hidden;
+}
+
+/* No specular sheen. A diagonal highlight band made sense when the panel was
+   heavily blurred and needed something to look like a surface; at 9px blur the
+   wallpaper reads straight through, and the gradient only muddied the top half.
+   The lit edges in the box-shadow above are enough to say "pane of glass". */
+
+:root[data-skin='aqua'][data-theme='dark'] .rts-window {
+  box-shadow:
+    0 16px 40px var(--glass-shadow),
+    0 2px 6px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 var(--glass-stroke),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.09);
+}
+
+/* The composer sits on the panel - no bar, no rule above it. The pill is enough
+   to say where the input is; a divider on top of glass just reads as a seam. */
+:root[data-skin='aqua'] .rts-composer {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* --- The bubble ---------------------------------------------------------- */
+
+:root[data-skin='aqua'] .rts-bubble {
+  border-radius: 16px;
+  padding: 6px 12px;
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+
+  /* Outer lift, then a multi-layer inset stroke - the same construction as the
+     Aqua traffic lights. The 0.5px inner stroke is what keeps the edge crisp at
+     this size; drop it and the bubble goes soft. */
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.14),
+    0 1px 1px rgba(0, 0, 0, 0.25),
+    inset 0 1px 2px rgba(255, 255, 255, 0.6),
+    inset 0 0 4px rgba(0, 0, 0, 0.05),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.48),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+
+  /* Safe: the "?" badge and the rating thumbs are siblings of the bubble, so
+     clipping the bubble doesn't clip them. */
+  overflow: hidden;
+
+  -webkit-font-smoothing: antialiased;
+  text-shadow: 0 2px 2px rgba(0, 0, 0, 0.07);
+}
+
+/* Top shine. Semi-transparent white rather than a baked color, so whichever role
+   fill is underneath still shows through. */
+:root[data-skin='aqua'] .rts-bubble::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 2px;
+  height: 12px;
+  background: linear-gradient(
+    rgba(255, 255, 255, 0.9),
+    rgba(255, 255, 255, 0.25)
+  );
+  border-radius: 16px 16px 4px 4px;
+  filter: blur(0.5px);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Bottom glow. Radius follows the bubble's own 16px rather than the tight 4px
+   the original shipped with - at this size the tight one reads as a seam. */
+:root[data-skin='aqua'] .rts-bubble::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 20px;
+  background: linear-gradient(
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0.45)
+  );
+  border-radius: 4px 4px 14px 14px;
+  filter: blur(0.6px);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Text clears both gradients. */
+:root[data-skin='aqua'] .rts-bubble > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* --- Dark ---------------------------------------------------------------- */
+
+/* The light stack has a 0.6-alpha white top inset. On a dim fill that reads as a
+   bright stripe, so the whole stack is repainted rather than patched: deeper
+   outer shadows, softer top inset, and the crisp inner stroke flipped from black
+   to white so the edge still catches. */
+:root[data-skin='aqua'][data-theme='dark'] .rts-bubble {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.35),
+    0 1px 1px rgba(0, 0, 0, 0.4),
+    inset 0 1px 2px rgba(255, 255, 255, 0.22),
+    inset 0 0 4px rgba(0, 0, 0, 0.18),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.18),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+  text-shadow: none;
+}
+
+:root[data-skin='aqua'][data-theme='dark'] .rts-bubble::before {
+  background: linear-gradient(
+    rgba(255, 255, 255, 0.18),
+    rgba(255, 255, 255, 0.05)
+  );
+}
+
+:root[data-skin='aqua'][data-theme='dark'] .rts-bubble::after {
+  background: linear-gradient(
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0.12)
+  );
+}
+
+/* --- The composer -------------------------------------------------------- */
+
+/* The pill is edges only - no fill of its own. A darker well would read as a
+   second material cut into the panel; letting the panel show straight through
+   makes it one surface with a groove pressed into it, which is what the inset
+   shadow is already describing. No backdrop-filter either: the panel behind has
+   blurred the wallpaper once already, and blurring the result again just dims
+   it without adding anything. */
+:root[data-skin='aqua'] .rts-input {
+  background-color: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-color: transparent;
+  border-radius: 999px;
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.14),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.28),
+    0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+:root[data-skin='aqua'][data-theme='dark'] .rts-input {
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.14),
+    0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+:root[data-skin='aqua'] .rts-input:focus {
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.14),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.32),
+    0 0 0 3px var(--focus-ring);
+}
+
+/* --- Aqua buttons -------------------------------------------------------- */
+
+/* Send button and the three traffic lights share one treatment: a bright arc
+   across the top half, which is the whole trick behind an Aqua orb. */
+:root[data-skin='aqua'] .rts-send,
+:root[data-skin='aqua'] .rts-toggle {
+  position: relative;
+  overflow: hidden;
+}
+
+:root[data-skin='aqua'] .rts-send {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.28),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+
+:root[data-skin='aqua'] .rts-send::after,
+:root[data-skin='aqua'] .rts-toggle::after {
+  content: '';
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  top: 6%;
+  height: 42%;
+  background: linear-gradient(
+    rgba(255, 255, 255, 0.85),
+    rgba(255, 255, 255, 0.15)
+  );
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* The letter clears its own gloss. */
+:root[data-skin='aqua'] .rts-toggle > span,
+:root[data-skin='aqua'] .rts-send > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* The traffic lights keep their own red/amber/green - the accent must not
+   repaint them - but they still get the Aqua rim and the gloss arc above, which
+   is what turns three flat dots into three lozenges. */
+:root[data-skin='aqua'] .rts-toggle {
+  box-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.25),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.35);
+}
+
+/* --- Badges: the "?" marker and the rating thumbs ------------------------ */
+
+/* Same material as a bubble, at 20px. The bubble gets its depth from a stack of
+   insets - bright at the top edge, dark hairline all round, soft ambient - plus
+   an outer lift; these are that stack scaled down, with the bottom glow folded
+   into the box-shadow rather than given its own element, because on the rating
+   circles `::before` is already the thumb glyph and `::after` is the only
+   pseudo left. */
+:root[data-skin='aqua'] .question-mark-circle,
+:root[data-skin='aqua'] .rating-circle {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.18),
+    0 1px 1px rgba(0, 0, 0, 0.22),
+    inset 0 1px 2px rgba(255, 255, 255, 0.55),
+    inset 0 -3px 4px rgba(255, 255, 255, 0.22),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.12);
+}
+
+/* The top shine, same shape as the bubble's - clipped to the circle by its own
+   radius rather than by overflow, so the thumb glyph underneath still paints. */
+:root[data-skin='aqua'] .question-mark-circle::after,
+:root[data-skin='aqua'] .rating-circle::after {
+  content: '';
+  position: absolute;
+  left: 15%;
+  right: 15%;
+  top: 8%;
+  height: 40%;
+  background: linear-gradient(
+    rgba(255, 255, 255, 0.85),
+    rgba(255, 255, 255, 0.2)
+  );
+  border-radius: 50%;
+  filter: blur(0.4px);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Glyphs clear the shine - the "?" is text, the thumb is the ::before mask. */
+:root[data-skin='aqua'] .question-mark-circle {
+  position: absolute; /* re-stated: the base rule sets it, stacking needs it */
+  z-index: 4;
+}
+:root[data-skin='aqua'] .rating-circle::before {
+  z-index: 2;
+}
+
+/* Dark: same reasoning as the bubbles - a 0.55 white inset reads as a stripe on
+   a dim fill, so the whole stack is repainted rather than patched. */
+:root[data-skin='aqua'][data-theme='dark'] .question-mark-circle,
+:root[data-skin='aqua'][data-theme='dark'] .rating-circle {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.4),
+    0 1px 1px rgba(0, 0, 0, 0.4),
+    inset 0 1px 2px rgba(255, 255, 255, 0.2),
+    inset 0 -3px 4px rgba(255, 255, 255, 0.08),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.16),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+  text-shadow: none;
+}
+
+:root[data-skin='aqua'][data-theme='dark'] .question-mark-circle::after,
+:root[data-skin='aqua'][data-theme='dark'] .rating-circle::after {
+  background: linear-gradient(
+    rgba(255, 255, 255, 0.22),
+    rgba(255, 255, 255, 0.06)
+  );
+}
+
+/* A rated thumb keeps its green/red, but the gloss stays - the color says what
+   you chose, the material says it's the same kind of control as everything else. */
+:root[data-skin='aqua'] .like-circle.selected,
+:root[data-skin='aqua'] .dislike-circle.selected {
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.3),
+    inset 0 1px 2px rgba(255, 255, 255, 0.6),
+    inset 0 -3px 4px rgba(255, 255, 255, 0.2),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.35);
+}
+
+/* --- Accent swatches ----------------------------------------------------- */
+
+.rts-accents {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 0 10px 0;
+}
+
+.rts-swatch {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: none;
+  outline: none;
+  border-radius: 50%;
+  cursor: pointer;
+  position: relative;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.25),
+    inset 0 1px 1px rgba(255, 255, 255, 0.5);
+  transition: transform 0.12s ease;
+}
+
+/* Swatches are badges too - same orb material, one size down. */
+:root[data-skin='aqua'] .rts-swatch {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.25),
+    inset 0 1px 1px rgba(255, 255, 255, 0.6),
+    inset 0 -2px 3px rgba(255, 255, 255, 0.2),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.4);
+}
+
+:root[data-skin='aqua'] .rts-swatch.is-on {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.25),
+    inset 0 1px 1px rgba(255, 255, 255, 0.6),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.4),
+    0 0 0 2px var(--glass-panel),
+    0 0 0 3.5px var(--accent);
+}
+
+:root[data-skin='aqua'] .rts-skin {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    inset 0 1px 1px rgba(255, 255, 255, 0.45),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.25);
+}
+
+.rts-swatch:hover { transform: scale(1.15); }
+
+.rts-swatch.is-on {
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.25),
+    inset 0 1px 1px rgba(255, 255, 255, 0.5),
+    0 0 0 2px var(--bg),
+    0 0 0 3.5px var(--accent);
+}
+
+.rts-swatch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}

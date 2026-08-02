@@ -1,5 +1,5 @@
 /* The original rating circles: same 20px shape as the "?" badge, pinned to the bubble's
-   two right-hand corners — thumbs-up top-right, thumbs-down bottom-right.
+   two right-hand corners - thumbs-up top-right, thumbs-down bottom-right.
 
    Hidden until you hover the message. A rating you've already given stays visible, so
    you can see what you told it. */
@@ -29,7 +29,7 @@
 .like-circle    { top: -10px; }
 .dislike-circle { bottom: -10px; }
 
-/* The thumb glyph, tinted through a mask rather than baked into the image — one asset,
+/* The thumb glyph, tinted through a mask rather than baked into the image - one asset,
    and it stays legible in dark mode. */
 .rating-circle::before {
   content: '';
