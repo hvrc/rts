@@ -7,7 +7,10 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci || npm install
 COPY . .
-ARG VITE_API_URL=https://str.hvrc.place
+# Default matches deploy.sh's default backend (the service's own run.app URL). deploy.sh
+# passes --set-build-env-vars to override it; this value is only the standalone-build
+# fallback. Keep the two in step, or a manual `docker build` ships the wrong backend.
+ARG VITE_API_URL=https://rts-backend-em6d5d3fha-ue.a.run.app
 ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
