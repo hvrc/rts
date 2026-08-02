@@ -185,11 +185,11 @@ function Rooms({ api, onEnter, reverse, joining, onBrowse }: RoomsProps) {
           <div className="rts-msg is-user">
             <div className="rts-msg-body rts-opts">
               <button type="button" onClick={() => setBot(b => !b)}
-                      className={`rts-bubble is-user rts-opt${bot ? ' is-on' : ''}`}>
+                      className={`rts-bubble is-user rts-opt rts-opt--toggle${bot ? ' is-on' : ''}`}>
                 {bot ? 'bot plays' : 'no bot'}
               </button>
               <button type="button" onClick={() => setTimer(t => !t)}
-                      className={`rts-bubble is-user rts-opt${timer ? ' is-on' : ''}`}>
+                      className={`rts-bubble is-user rts-opt rts-opt--toggle${timer ? ' is-on' : ''}`}>
                 {timer ? '20s' : 'no clock'}
               </button>
             </div>

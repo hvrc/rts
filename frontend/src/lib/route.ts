@@ -3,6 +3,7 @@
  *
  *   /                    the game, against the bot
  *   /rooms               the lobby
+ *   /database            every conversation ever recorded. typed, never linked.
  *   /<room>              that room
  *   /<room>/settings     that room, with its settings open
  *
@@ -20,20 +21,24 @@
 export type Route =
   | { at: 'solo' }
   | { at: 'lobby' }
+  | { at: 'database' }
   | { at: 'room'; slug: string; settings: boolean };
 
 export const LOBBY_PATH = 'rooms';
+export const DATABASE_PATH = 'database';
 
 export function parse(pathname: string): Route {
   const parts = pathname.split('/').filter(Boolean);
   if (parts.length === 0) return { at: 'solo' };
   if (parts[0] === LOBBY_PATH) return { at: 'lobby' };
+  if (parts[0] === DATABASE_PATH) return { at: 'database' };
   return { at: 'room', slug: parts[0], settings: parts[1] === 'settings' };
 }
 
 export function path(route: Route): string {
   if (route.at === 'solo') return '/';
   if (route.at === 'lobby') return `/${LOBBY_PATH}`;
+  if (route.at === 'database') return `/${DATABASE_PATH}`;
   return `/${route.slug}${route.settings ? '/settings' : ''}`;
 }
 

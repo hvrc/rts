@@ -100,8 +100,12 @@
 }
 
 /* An off setting keeps the bubble's shape and loses its confidence, so the row reads
-   as two switches rather than as two different kinds of thing. */
-.rts-opt:not(.is-on):not(.is-go):not([type='submit']) { opacity: 0.55; }
+   as two switches rather than as two different kinds of thing.
+
+   Scoped to things that are actually switches. Fading every unselected `.rts-opt`
+   also faded the buttons that just *do* something - export, back - and a button at
+   55% reads as one you are not allowed to press. */
+.rts-opt--toggle:not(.is-on) { opacity: 0.55; }
 
 .rts-opt.is-go { font-weight: 600; }
 

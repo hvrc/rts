@@ -8,6 +8,9 @@ refactor, so they are measured rather than eyeballed:
     node tests/panels.cjs    the appearance panel, and the bars not cutting bubbles
     node tests/chrome.cjs    --chrome-top tracks the header through every state
 
+/database has no test: it fetches one document and prints it, and there is nothing
+between those two steps worth pinning down.
+
 They drive a real Chrome against a running dev server - `npm run dev` on :5174 and the
 backend on :5001 - because all three are questions about rendered geometry and browser
 history, and none of them can be answered by a renderer that only pretends to lay out.

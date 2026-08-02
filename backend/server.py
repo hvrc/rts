@@ -289,17 +289,76 @@ def rooms_events(room_id):
     })
 
 
+# ---------------------------------------------------------------------------
+# the archive
+# ---------------------------------------------------------------------------
+#
+# Every conversation this backend has ever recorded, and a way to pull it out. Not
+# linked from anywhere in the app: you reach /database by typing it.
+#
+# Which database that is follows from where the process is running - SQLite on a
+# laptop, Firestore on Cloud Run - so the same page shows local runs locally and real
+# ones in production without knowing which it is looking at.
+#
+# RTS_TRANSCRIPT_TOKEN gates all of it when set. Left unset it is open, which is the
+# right default for a laptop and the wrong one for the internet: these are real
+# conversations people had. Set it in production and pass ?token= to read.
+
+_TOKEN = os.environ.get("RTS_TRANSCRIPT_TOKEN", "").strip()
+
+
+def _may_read():
+    return not _TOKEN or request.args.get("token", "") == _TOKEN
+
+
 @app.route("/transcripts", methods=["GET"])
 def transcripts():
     """Recently active chats, newest first. `?chat_id=` returns one chat's messages."""
+    if not _may_read():
+        return jsonify({"error": "not allowed"}), 403
     chat_id = request.args.get("chat_id")
     if chat_id:
         return jsonify({"chat_id": chat_id, "messages": transcript.chat(chat_id)}), 200
     try:
-        limit = min(int(request.args.get("limit", 50)), 500)
+        limit = min(int(request.args.get("limit", 500)), 5000)
     except ValueError:
-        limit = 50
-    return jsonify({"chats": transcript.chats(limit)}), 200
+        limit = 500
+    return jsonify({"chats": transcript.chats(limit), "store": transcript.store().name}), 200
+
+
+@app.route("/database", methods=["GET"])
+def database():
+    """Everything, as one JSON document.
+
+    No interface, no pagination, no download button - the browser's own JSON viewer is
+    a better reader than anything worth building here, and `curl .../database | jq` is
+    a better one than that. One document rather than a stream of lines because this is
+    meant to be *looked at*, and a viewer needs the whole thing anyway.
+
+    `?chat_id=` narrows it to one chat when that is all you wanted.
+    """
+    if not _may_read():
+        return jsonify({"error": "not allowed"}), 403
+
+    one = request.args.get("chat_id")
+    listing = ([c for c in transcript.chats(limit=10_000) if c["chat_id"] == one]
+               if one else transcript.chats(limit=10_000))
+
+    return jsonify({
+        "store": transcript.store().name,
+        "chats": [
+            {
+                "chat_id": c["chat_id"],
+                # `messages` is the list; the count it used to hold moves aside rather
+                # than sitting under the same name as the thing it counts.
+                "count": c.get("messages"),
+                "started": c.get("started"),
+                "last_seen": c.get("last_seen"),
+                "messages": transcript.chat(c["chat_id"]),
+            }
+            for c in listing
+        ],
+    }), 200
 
 
 if __name__ == "__main__":

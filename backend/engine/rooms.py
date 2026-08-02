@@ -37,7 +37,8 @@ BOT_NAME = "rts"
 #: Room ids are the first path segment on the site, so a room called "rooms" would
 #: shadow the lobby. Reserved rather than moved under a prefix: the link to a room is
 #: the point of rooms, and the shortest link is the best one.
-RESERVED = {"rooms", "settings", "api", "static", "assets", "index", "favicon"}
+RESERVED = {"rooms", "database", "settings", "api", "static", "assets", "index",
+            "favicon"}
 
 #: Seconds a player has to take their turn. The client draws the same number.
 TURN_S = 20
