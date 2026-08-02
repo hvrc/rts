@@ -15,9 +15,9 @@ MOVE_SCHEMA = {
                      "RESTART"],
             "description": (
                 "OK — they played a word you accept; you play yours back.\n"
-                "ASK — you cannot see how their word connects. Ask them. Nobody loses, "
-                "the chain waits. This is the right code whenever a link is unclear, and "
-                "it is always better than guessing.\n"
+                "ASK — their word doesn't land for you and you want to hear why. Nobody "
+                "loses, the chain waits. This is the right code whenever a link is "
+                "unclear, and it is always better than guessing.\n"
                 "UNRELATED — you asked, they answered, and it still does not connect. A "
                 "challenge to them, not a loss for you.\n"
                 "DUPLICATE — that exact word, or a plural or tense of it, is already in "

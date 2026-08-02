@@ -71,7 +71,11 @@ def _turn_block(game, player_input, correction=None, preferences=None):
                      else "(empty — nothing played yet this game)"),
         "already played, cannot be replayed: "
         + (", ".join(sorted(game.used)) if game.used else "(nothing)"),
-        "they must connect to: "
+        # Worded neutrally on purpose. This block is resent every single turn, so any
+        # phrasing in it becomes the phrasing the bot reaches for — "they must connect to"
+        # was priming a stock question ("X? how's that connect to Y") that no amount of
+        # telling it to vary could shift.
+        "word in play: "
         + (game.last_word or "(nothing yet — any legal word opens)"),
         "</board>",
     ]
@@ -89,6 +93,20 @@ def _turn_block(game, player_input, correction=None, preferences=None):
             "played something else instead, that's them giving up the round — take the "
             "new word and move on without making a thing of it.",
             "</open_question>",
+        ]
+
+    # Shown rather than described, because being told to vary the phrasing doesn't work —
+    # the same sentence comes back with one word swapped. Seeing the actual repetition does.
+    asked = game.history.asks[-4:]
+    if asked:
+        lines += [
+            "",
+            "<questions_you_have_already_asked>",
+            *(f"  {a}" for a in asked),
+            "Read those back. If they're the same sentence with the words changed, you're "
+            "handing them a form to fill in rather than asking anything. Ask the next one "
+            "some other way entirely.",
+            "</questions_you_have_already_asked>",
         ]
 
     record = history.describe_track_record(game.history, "human")

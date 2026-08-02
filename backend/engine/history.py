@@ -100,6 +100,12 @@ class History:
         self.events = []              # [Event]        — what happened
         self.links = []               # [Link]         — what was argued over
 
+        # Every question the bot has asked, verbatim. Kept because telling a model to
+        # "vary your phrasing" does almost nothing — it has a strong prior for one shape
+        # and reaches for it every time, swapping a synonym in when the shape is banned.
+        # Showing it what it actually said works where the instruction didn't.
+        self.asks = []
+
     def record(self, kind, player, word=None, reason=None):
         self.events.append(Event(kind, player, word, reason))
 

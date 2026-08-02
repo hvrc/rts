@@ -6,15 +6,20 @@ from .. import config
 from ..schema import MOVE_SCHEMA
 from .base import Provider
 
+# A paused turn should resume in one hop; more than a couple means something is wrong.
+_MAX_RESUMES = 3
+
 
 class AnthropicProvider(Provider):
     name = "anthropic"
 
-    def __init__(self, model=None, max_tokens=None, effort=None, thinking=None):
+    def __init__(self, model=None, max_tokens=None, effort=None, thinking=None,
+                 search=None):
         self.model = model or config.MODEL
         self.max_tokens = max_tokens or config.MAX_TOKENS
         self.effort = effort if effort is not None else config.EFFORT
         self.thinking = thinking if thinking is not None else config.THINKING
+        self.search = search if search is not None else config.SEARCH
         self._client = None
 
     def _client_lazy(self):
@@ -46,6 +51,17 @@ class AnthropicProvider(Provider):
             "output_config": output_config,
             "messages": messages,
         }
+
+        # Runs on Anthropic's side, so there's no execution loop to write — but it does
+        # cost seconds, and someone is watching a typing indicator. The prompt is what
+        # keeps it rare: it's for justifications that turn on something the model has no
+        # way to know, not for looking up whether two ordinary words are related.
+        if self.search:
+            request["tools"] = [{
+                "type": "web_search_20260209",
+                "name": "web_search",
+                "max_uses": self.search,
+            }]
         # Judging whether two words are related is the one genuinely hard call in a turn,
         # and it was being made with reasoning switched off. Leave thinking on unless a
         # model is configured that can't do it — and note that disabling it on Sonnet 5
@@ -54,6 +70,36 @@ class AnthropicProvider(Provider):
         if self.thinking:
             request["thinking"] = {"type": self.thinking}
 
-        resp = self._client_lazy().messages.create(**request)
-        text = next(b.text for b in resp.content if b.type == "text")
-        return json.loads(text)
+        client = self._client_lazy()
+        resp = client.messages.create(**request)
+
+        # A long server-tool turn can stop early and ask to be continued. Send it straight
+        # back to pick up where it left off; without this the turn returns half-finished
+        # and the JSON is simply missing.
+        for _ in range(_MAX_RESUMES):
+            if resp.stop_reason != "pause_turn":
+                break
+            request["messages"] = [*messages, {"role": "assistant", "content": resp.content}]
+            resp = client.messages.create(**request)
+
+        return _parse_move(resp)
+
+
+def _parse_move(resp):
+    """Pull the structured move out of the response.
+
+    Taking the first text block was fine when a response was only ever one block. With
+    search in play the model narrates around the results, so the JSON is the *last* text
+    block rather than the first — and search result blocks sit in between. Work backwards
+    and take the first thing that parses.
+    """
+    blocks = [b for b in resp.content if b.type == "text"]
+    for block in reversed(blocks):
+        try:
+            return json.loads(block.text)
+        except (json.JSONDecodeError, AttributeError):
+            continue
+    raise ValueError(
+        f"no JSON move in response (stop_reason={resp.stop_reason}, "
+        f"blocks={[b.type for b in resp.content]})"
+    )

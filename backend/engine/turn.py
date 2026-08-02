@@ -163,7 +163,9 @@ def _play(player_input, game_id, reverse, preferences):
         asked_about = _clean(data.get("their_word")) or text.lower()
         game.pending = history.Pending(asked_about, game.last_word, "bot")
         game.history.record(history.CHALLENGED, "human", asked_about)
-        return contract.contract("ASK", reply or f"{asked_about}? how's that connect")
+        if reply:
+            game.history.asks.append(reply)
+        return contract.contract("ASK", reply or f"{asked_about}?")
 
     # --- the human asked to start over, or asked the AI to open ---
     # Asking for a fresh word while you owe an answer is a way of dropping the argument,

@@ -46,3 +46,9 @@ EFFORT = (os.environ.get("RTS_EFFORT") or "medium").strip() or None
 # Opus 5 when omitted, so this mostly exists to turn thinking OFF for a cheap model.
 # Haiku 4.5 rejects both this and EFFORT — set RTS_THINKING= and RTS_EFFORT= for it.
 THINKING = (os.environ.get("RTS_THINKING") or "adaptive").strip() or None
+
+# Anthropic only. Max web searches the bot may run in one turn; 0 turns it off. Server
+# side, so there is nothing to execute locally -- but each one costs seconds of a turn
+# somebody is waiting on, which is why the ceiling is low and the prompt says to reach
+# for it rarely.
+SEARCH = int(os.environ.get("RTS_SEARCH", "2"))
