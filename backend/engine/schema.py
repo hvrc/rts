@@ -36,6 +36,15 @@ MOVE_SCHEMA = {
         "train_of_thought": {
             "type": "array",
             "items": {"type": "array", "items": {"type": "string"}},
+            "description": (
+                "Single words only — never sentences, reasoning or explanation. These are "
+                "drawn scattered across the screen and then faded out one by one, so each "
+                "string has to be one word a player might actually have played. A "
+                "narrowing sequence: the first list is the wide field of candidates you "
+                "weighed (6-9 words, all legal, none already used), each list after it "
+                "drops some of them, and the last is exactly [chosen_word]. Empty when "
+                "you didn't play a word."
+            ),
         },
         "response": {"type": "string"},
     },
