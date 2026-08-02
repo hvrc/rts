@@ -464,32 +464,36 @@ function Chat() {
   /**
    * Measure the floating bars so the conversation can be padded clear of them.
    *
-   * The top bar is not a fixed height - it grows when the appearance strip opens - so
-   * this observes both bars rather than hardcoding an inset that would be wrong half
-   * the time.
+   * Neither bar is a fixed height - the top one grows when a panel opens under it, and
+   * the lobby has no composer at all - so both are measured rather than assumed.
+   *
+   * The two are handled independently on purpose. Requiring both to exist before
+   * measuring either meant that opening the lobby, which removes the composer, took
+   * the observer down with it: `--chrome-top` then froze at whatever it last read,
+   * and if a panel happened to be open at the time the lobby kept a panel's worth of
+   * empty space above its first line for the rest of the session.
    */
   useEffect(() => {
     const win = windowRef.current;
     if (!win) return;
-    const header = win.querySelector<HTMLElement>('.rts-header-group');
-    const composer = win.querySelector<HTMLElement>('.rts-composer');
-    if (!header || !composer) return;
 
     const sync = () => {
-      win.style.setProperty('--chrome-top', `${header.offsetHeight}px`);
-      win.style.setProperty('--chrome-bottom', `${composer.offsetHeight}px`);
+      const header = win.querySelector<HTMLElement>('.rts-header-group');
+      const composer = win.querySelector<HTMLElement>('.rts-composer');
+      win.style.setProperty('--chrome-top', `${header?.offsetHeight ?? 0}px`);
+      win.style.setProperty('--chrome-bottom', `${composer?.offsetHeight ?? 0}px`);
     };
     sync();
 
     const observer = new ResizeObserver(sync);
-    observer.observe(header);
-    observer.observe(composer);
+    for (const selector of ['.rts-header-group', '.rts-composer']) {
+      const el = win.querySelector(selector);
+      if (el) observer.observe(el);
+    }
     return () => observer.disconnect();
-    // Re-run when the lobby comes and goes: it replaces the composer rather than
-    // hiding it, so the observer would otherwise be left measuring a node that is no
-    // longer in the document - and --chrome-bottom is what keeps the last message
-    // clear of the bar.
-  }, [lobby]);
+    // The observer catches a bar changing size; these catch one appearing or being
+    // taken away, which it cannot see because there is nothing left to watch.
+  }, [lobby, appearanceOpen, roomBarOpen]);
 
   /**
    * Track the visual viewport, which is what the keyboard actually changes.
