@@ -21,6 +21,8 @@ without a restart. They're small; the cost is nothing.
 
 from pathlib import Path
 
+from . import history
+
 _DIR = Path(__file__).parent / "prompts"
 
 # Order matters: who you are, then what the game is, then how to judge, then how to talk.
@@ -73,6 +75,26 @@ def _turn_block(game, player_input, correction=None, preferences=None):
         + (game.last_word or "(nothing yet — any legal word opens)"),
         "</board>",
     ]
+
+    # An open question changes how the next message reads. Without this the bot asks
+    # "how?", gets an answer, and has no idea the answer is an answer.
+    if game.pending:
+        p = game.pending
+        lines += [
+            "",
+            "<open_question>",
+            f"you asked how {p.word!r} connects to {p.frm!r} and they haven't settled it "
+            "yet. Read what they just said as their answer to that.",
+            "If they've argued for it, judge the argument. If they've dropped it and "
+            "played something else instead, that's them giving up the round — take the "
+            "new word and move on without making a thing of it.",
+            "</open_question>",
+        ]
+
+    record = history.describe_track_record(game.history, "human")
+    if record:
+        lines += ["", "<how_their_arguments_have_gone>", record,
+                  "</how_their_arguments_have_gone>"]
 
     taste = preferences.as_prompt_block() if preferences else ""
     if taste:

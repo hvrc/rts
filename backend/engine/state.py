@@ -10,6 +10,7 @@ toy; a real multiplayer build swaps GameStore for something durable (Redis, Fire
 without touching the callers.
 """
 
+from .history import History
 from .rules import LetterRule
 
 SOLO_ID = "solo"
@@ -23,18 +24,25 @@ TRANSCRIPT_WINDOW = 40
 class Game:
     """One game's worth of state.
 
-    The chain and the transcript are different things and get reset at different times.
-    The chain is the game; it's wiped whenever a game ends. The transcript is the
-    conversation, and conversations don't restart just because a game did — the human
-    can still see the last twenty messages on screen, so the bot has to remember them too.
+    The split that matters is board vs history. The board — chain, spent words, whose
+    turn — is the game, and it's wiped whenever one ends. The history is the session: what
+    was said, what happened, what was argued over. That doesn't restart just because a
+    game did. The human can still see the last twenty messages on screen, so the bot has
+    to remember them too, and a score kept across three games is only a score if it
+    survives all three.
     """
 
-    def __init__(self, reverse=False, transcript=None):
+    def __init__(self, reverse=False, history=None):
         self.chain = []                     # ordered words played, both sides
         self.used = set()                   # lowercased words already spent
         self.last_word = None               # the word the next move must relate to
         self.rule = LetterRule(reverse)     # normal or reversed letter rule
-        self.transcript = list(transcript or [])   # [(role, text)] — survives a restart
+        self.history = history or History() # transcript, events, links — outlives resets
+        self.pending = None                 # a question nobody has answered yet
+
+    @property
+    def transcript(self):
+        return self.history.transcript
 
     def add(self, word):
         w = word.lower()
@@ -70,15 +78,16 @@ class GameStore:
         return self._games[game_id]
 
     def reset(self, game_id=SOLO_ID, reverse=False):
-        """Wipe the game, keep the conversation.
+        """Wipe the board, keep the history.
 
-        A loss or a restart clears the board, but the two of them are still talking and
-        the history is still on screen. Carrying the transcript over is what stops the bot
-        answering "why did you say owl?" with "what owl?" one turn after a new game began.
+        A loss or a restart clears the chain, but the two of them are still talking and
+        the messages are still on screen. Carrying the history over is what stops the bot
+        answering "why did you say owl?" with "what owl?" one turn after a new game began
+        — and it's what makes a score across several games mean anything.
         """
         previous = self._games.get(game_id)
         self._games[game_id] = Game(
-            reverse, transcript=previous.transcript if previous else None
+            reverse, history=previous.history if previous else None
         )
         return self._games[game_id]
 
