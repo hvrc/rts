@@ -128,6 +128,9 @@ const TYPE_MS = 18;
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+/** Below this the window stops being a window and becomes the whole screen. */
+const PHONE = '(max-width: 640px)';
+
 /** `?skin=flat` wins over the stored preference - one URL to compare the two. */
 function initialSkin(): Skin {
   const param = new URLSearchParams(window.location.search).get('skin');
@@ -192,6 +195,19 @@ function Chat() {
   // actually moved it, so resizing the viewport keeps re-centering until then.
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const [dragging, setDragging] = useState(false);
+
+  // On a phone the widget stops being a draggable window and becomes the app: full
+  // bleed, no drag, no resize. The glass is translucent, so the wallpaper still reads
+  // through it rather than being lost.
+  const [phone, setPhone] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(PHONE).matches);
+
+  useEffect(() => {
+    const query = window.matchMedia(PHONE);
+    const sync = (e: MediaQueryListEvent) => setPhone(e.matches);
+    query.addEventListener('change', sync);
+    return () => query.removeEventListener('change', sync);
+  }, []);
 
   // Explicit size, once resized. `null` keeps the CSS defaults (280 wide, up to
   // 480 tall) so the window still adapts to short viewports until it's touched.
@@ -374,6 +390,51 @@ function Chat() {
     observer.observe(header);
     observer.observe(composer);
     return () => observer.disconnect();
+  }, []);
+
+  /**
+   * Track the visual viewport, which is what the keyboard actually changes.
+   *
+   * Opening the keyboard shrinks the *visual* viewport but leaves the *layout* viewport
+   * alone, and `position: fixed` is anchored to the layout one. So the window kept its
+   * full height, the keyboard covered the bottom of it, and Safari scrolled the whole
+   * thing up to reveal the input - taking the conversation off the top of the screen
+   * and leaving the cut-off tail.
+   *
+   * Publishing the visual viewport's height and offset as variables lets the window
+   * size itself to the space actually visible, which is what a chat app does: the
+   * composer sits on the keyboard, the messages keep the rest, and nothing scrolls off.
+   */
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+
+    const root = document.documentElement;
+    const sync = () => {
+      root.style.setProperty('--viewport-height', `${viewport.height}px`);
+      root.style.setProperty('--viewport-offset', `${viewport.offsetTop}px`);
+    };
+    sync();
+
+    // `resize` fires when the keyboard opens or closes; `scroll` fires as iOS settles
+    // the offset afterwards, and without it the window lands a few pixels adrift.
+    viewport.addEventListener('resize', sync);
+    viewport.addEventListener('scroll', sync);
+    return () => {
+      viewport.removeEventListener('resize', sync);
+      viewport.removeEventListener('scroll', sync);
+    };
+  }, []);
+
+  /* Keep the newest message in view as the keyboard takes its space, the way every
+     chat app does - otherwise the conversation stays where it was and the last thing
+     said ends up behind the keyboard. */
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const stick = () => messagesEndRef.current?.scrollIntoView({ block: 'end' });
+    viewport.addEventListener('resize', stick);
+    return () => viewport.removeEventListener('resize', stick);
   }, []);
 
   const scrollToBottom = () => {
@@ -729,21 +790,35 @@ function Chat() {
   return (
     <div
       ref={windowRef}
-      className={`rts-window${dragging ? ' is-dragging' : ''}${resizing ? ' is-resizing' : ''}`}
+      className={`rts-window${dragging ? ' is-dragging' : ''}${resizing ? ' is-resizing' : ''}${phone ? ' is-phone' : ''}`}
       style={{
         position: 'fixed',
         display: 'flex',
         flexDirection: 'column',
-        // Untouched: 280 wide and as tall as fits, capped at 480. Once resized,
-        // both become explicit and the cap no longer applies.
-        width: size ? size.w : 280,
-        height: size ? size.h : '100%',
-        ...(size ? null : { maxHeight: 480 }),
-        // Once dragged, explicit coordinates replace the CSS centering.
-        ...(pos ? { left: pos.x, top: pos.y, transform: 'none' } : null),
+        ...(phone
+          // The screen, minus whatever the keyboard has taken. Falls back to dvh on a
+          // browser without visualViewport, which is the pre-keyboard behaviour rather
+          // than a broken one.
+          ? {
+              left: 0,
+              top: 'var(--viewport-offset, 0px)',
+              width: '100%',
+              height: 'var(--viewport-height, 100dvh)',
+            }
+          // Untouched: 280 wide and as tall as fits, capped at 480. Once resized,
+          // both become explicit and the cap no longer applies.
+          : {
+              width: size ? size.w : 280,
+              height: size ? size.h : '100%',
+              ...(size ? null : { maxHeight: 480 }),
+              // Once dragged, explicit coordinates replace the CSS centering.
+              ...(pos ? { left: pos.x, top: pos.y, transform: 'none' } : null),
+            }),
       }}
     >
-      {RESIZE_EDGES.map((edge) => (
+      {/* No resize handles on a phone: the window is the screen, and 7px grab strips
+          along the edges would only intercept scrolls. */}
+      {!phone && RESIZE_EDGES.map((edge) => (
         <div
           key={edge}
           className={`rts-resize rts-resize--${edge}`}
@@ -765,7 +840,8 @@ function Chat() {
           darkPref,
           setDarkPref,
         }}
-        onDragStart={startDrag}
+        // the traffic lights where a touch is far more likely to be a scroll.
+        onDragStart={phone ? () => {} : startDrag}
       />
       <div
         ref={chatBoxRef}

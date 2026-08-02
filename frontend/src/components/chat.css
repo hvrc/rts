@@ -20,6 +20,32 @@
   transition: background 0.25s ease, box-shadow 0.25s ease;
 }
 
+/* On a phone the window is the app. Full bleed, square, flat - the framing that makes
+   it read as a window on a desktop only wastes screen here, and the glass is
+   translucent so the wallpaper still comes through it rather than being lost.
+
+   The centering transform has to be cancelled explicitly: the inline style sets left
+   and top, but nothing overrides a transform, and a translate(-50%, -50%) still
+   applied would put the window half off two edges. */
+.rts-window.is-phone {
+  transform: none;
+  border-radius: 0;
+  box-shadow: none;
+  max-height: none;
+}
+
+/* Full bleed means the app now owns the notch and the home indicator, so the controls
+   have to be inset out of them by hand - `viewport-fit=cover` buys the pixels but does
+   not keep anything out of the way. The composer's inset collapses to zero when the
+   keyboard is up, because the home indicator is not there to avoid then. */
+.rts-window.is-phone .rts-header {
+  padding-top: calc(12px + env(safe-area-inset-top, 0px));
+}
+
+.rts-window.is-phone .rts-composer {
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+}
+
 /* No transition on position while dragging - the window has to track the
    pointer exactly, and it lifts slightly so the drag reads as picked up. */
 .rts-window.is-dragging {

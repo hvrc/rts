@@ -111,6 +111,16 @@
   box-shadow: none;
 }
 
+/* Full bleed on a phone: no rounded corners to clip against, and no drop shadow with
+   nothing behind it to fall on. The glass fill and blur stay - that is what keeps the
+   wallpaper visible through the app rather than behind a frame. */
+:root[data-skin='aqua'] .rts-window.is-phone {
+  border-radius: 0;
+  box-shadow:
+    inset 0 1px 0 var(--glass-stroke),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.10);
+}
+
 /* --- The bubble ---------------------------------------------------------- */
 
 :root[data-skin='aqua'] .rts-bubble {
