@@ -26,6 +26,10 @@ REGION="${REGION:-us-east1}"
 BACKEND_SERVICE="${BACKEND_SERVICE:-rts-backend}"
 FRONTEND_SERVICE="${FRONTEND_SERVICE:-rts-frontend}"
 SECRET="${SECRET:-rts-anthropic-key}"          # secret name in this project's Secret Manager
+# Turns are recorded here. Set explicitly rather than inferred: Cloud Run does not set
+# GOOGLE_CLOUD_PROJECT (that is an App Engine variable), so leaving the engine to guess
+# meant it quietly fell back to a SQLite file on an ephemeral disk.
+FIRESTORE_DB="${FIRESTORE_DB:-rts-transcripts}"
 CUSTOM_DOMAIN="${CUSTOM_DOMAIN-rts.hvrc.place}"     # frontend subdomain
 # Backend hostname the frontend calls. Empty (the default) means "use the service's own
 # run.app URL" - stable across redeploys, no DNS, no certificate to wait on. Set it to a
@@ -105,7 +109,7 @@ gcloud run deploy "${BACKEND_SERVICE}" \
   --source backend --region "${REGION}" --allow-unauthenticated \
   --min-instances 0 --max-instances 1 --cpu 1 --memory 512Mi --port 8080 --timeout 120 \
   --set-secrets "ANTHROPIC_API_KEY=${SECRET}:latest" \
-  --set-env-vars "CORS_ORIGINS=https://${CUSTOM_DOMAIN}" \
+  --set-env-vars "CORS_ORIGINS=https://${CUSTOM_DOMAIN},RTS_FIRESTORE_DB=${FIRESTORE_DB}" \
   --quiet
 BURL="$(gcloud run services describe "${BACKEND_SERVICE}" --region "${REGION}" --format='value(status.url)')"
 echo "Backend URL: ${BURL}"

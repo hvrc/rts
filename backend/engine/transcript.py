@@ -47,9 +47,23 @@ _SQLITE_PATH = os.environ.get(
     str(Path(__file__).resolve().parent.parent / "transcripts.db"),
 ).strip()
 
+def _hosted():
+    """Are we running on Google's infrastructure?
+
+    Checked across both, because they advertise themselves differently and getting this
+    wrong fails silently: Cloud Run sets K_SERVICE and does *not* set
+    GOOGLE_CLOUD_PROJECT, which is an App Engine variable. Keying only on the latter
+    meant the deployed service quietly chose the SQLite fallback and wrote its history
+    to a disk that is discarded on the next deploy - persistence that reported success
+    and kept nothing.
+    """
+    return bool(os.environ.get("K_SERVICE") or os.environ.get("GAE_ENV")
+                or os.environ.get("GOOGLE_CLOUD_PROJECT"))
+
+
 _FIRESTORE_DB = os.environ.get(
     "RTS_FIRESTORE_DB",
-    "rts-transcripts" if os.environ.get("GOOGLE_CLOUD_PROJECT") else "",
+    "rts-transcripts" if _hosted() else "",
 ).strip()
 
 
