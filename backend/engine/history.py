@@ -33,6 +33,7 @@ CONCEDED = "conceded"              # gave up the round
 EXPLICIT = "explicit"              # "ok you got me"
 ABANDONED = "abandoned_challenge"  # walked away from an open question
 RESTARTED = "requested_restart"    # asked for a new word instead of finishing this one
+TIMED_OUT = "timed_out"            # the clock ran out with nothing said
 
 
 class Event:
@@ -128,7 +129,8 @@ def score(history, player):
     """Rounds lost, and why. Nobody is shown this unless they ask for it.
 
     A round is lost by giving it up - saying so, or walking away from an open question,
-    or asking for a fresh word rather than finishing the one you're on. Asking and
+    or asking for a fresh word rather than finishing the one you're on, or letting the
+    clock run out. Asking and
     arguing are free, and deliberately so: questioning is how the game is played, and
     charging for it would teach people not to.
     """
@@ -138,6 +140,7 @@ def score(history, player):
         "gave_up": sum(1 for e in lost if e.reason == EXPLICIT),
         "walked_away": sum(1 for e in lost if e.reason == ABANDONED),
         "restarted": sum(1 for e in lost if e.reason == RESTARTED),
+        "timed_out": sum(1 for e in lost if e.reason == TIMED_OUT),
         "rule_breaks": _count(history, RULE_BREAK, player),
         "repeats": _count(history, REPEAT, player),
     }

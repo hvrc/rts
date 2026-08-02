@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, type ReactNode } from 'react';
 import './header.css';
 import { ACCENT_ORDER, accentSwatch, type AccentId } from '../lib/accent';
 import type { DarkModePreference } from '../lib/darkMode';
@@ -38,6 +38,9 @@ interface HeaderProps {
 
   /** The bar doubles as the window's drag handle. */
   onDragStart: (e: React.PointerEvent) => void;
+
+  /** The turn clock. Owns the right end of the bar; the lights own the left. */
+  clock?: ReactNode;
 }
 
 const LETTERS = [
@@ -48,7 +51,7 @@ const LETTERS = [
 
 const LONG_PRESS_MS = 400;
 
-function Header({ reverse, theme, thoughts, appearance, onDragStart }: HeaderProps) {
+function Header({ reverse, theme, thoughts, appearance, onDragStart, clock }: HeaderProps) {
   const toggles = { reverse, theme, thoughts };
 
   // A long press on `t` opens the appearance strip instead of flipping the
@@ -109,6 +112,8 @@ function Header({ reverse, theme, thoughts, appearance, onDragStart }: HeaderPro
             </button>
           );
         })}
+        <div className="rts-header-spacer" />
+        {clock}
       </div>
 
       {appearance.open && (

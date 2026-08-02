@@ -4,6 +4,7 @@ import './chat.css';
 import '../skins/aqua.css';
 import Header from './Header';
 import Rating from './Rating';
+import TurnTimer from './TurnTimer';
 import { gameId, loadPrefs, ratePair, type Link, type Rating as RatingValue } from '../lib/prefs';
 import { applyAccent, isAccentId, sampleWallpaperAccent, DEFAULT_ACCENT, type AccentId } from '../lib/accent';
 import {
@@ -46,6 +47,10 @@ interface ServerResponse {
   response_code: string;
   link?: Link;
   new_game?: boolean;
+
+  // True when the human is now opening rather than answering: nothing on the board to
+  // connect to, so nothing to be timed on.
+  opening?: boolean;
 }
 
 type Skin = 'aqua' | 'flat';
@@ -128,6 +133,9 @@ const TYPE_MS = 18;
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+/** How long a player has to answer once it is their turn. Both sides get it. */
+const TURN_MS = 20_000;
+
 /** Below this the window stops being a window and becomes the whole screen. */
 const PHONE = '(max-width: 640px)';
 
@@ -183,6 +191,18 @@ function Chat() {
   const [accent, setAccent] = useState<AccentId>(initialAccent);
   const [wallpaperAccent, setWallpaperAccent] = useState<string | null>(null);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
+
+  /* Wall-clock ms when this turn expires, or null when no clock is running - while
+     the bot is thinking, during the intro, and once a game has been lost. */
+  const [deadline, setDeadline] = useState<number | null>(null);
+  const startClock = useCallback(() => setDeadline(Date.now() + TURN_MS), []);
+  const stopClock = useCallback(() => setDeadline(null), []);
+
+  /* Both sides are on the clock, so expiry needs to know whose it was. A ref rather
+     than state: the expiry callback is held by an animation frame and would otherwise
+     close over whichever turn it was created in. */
+  const turnRef = useRef<'human' | 'bot'>('human');
+  const inFlight = useRef<AbortController | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const latestBotMessageRef = useRef<HTMLDivElement>(null);
@@ -522,6 +542,60 @@ function Chat() {
     });
   }, []);
 
+  /**
+   * The clock ran out. Tell the server, not a faked message.
+   *
+   * /timeout is its own route: running out of time is something this client observed,
+   * not something the player typed, and posting an invented sentence to /echo would
+   * write words they never said into the transcript and into the model's memory of the
+   * conversation.
+   */
+  const handleExpire = useCallback(async () => {
+    stopClock();
+    const loser = turnRef.current;
+    // A forfeit can leave either side to open; the server says which.
+    let opensNext = false;
+
+    if (loser === 'bot') {
+      // Abandon the turn it failed to finish. Without this the answer could still
+      // arrive seconds later and land in a game that has already been restarted,
+      // playing a word into a chain it was never connected to.
+      inFlight.current?.abort();
+      inFlight.current = null;
+    } else {
+      setMessages(prev => [...prev, { text: '', isUser: false, pending: true }]);
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/timeout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          game_id: gameId(),
+          reverse: reverseRef.current,
+          who: loser,
+        }),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data: ServerResponse = await response.json();
+      settlePending({ text: data.response, isUser: false });
+      opensNext = !!data.opening;
+    } catch (error) {
+      console.error('Timeout:', error);
+      settlePending({
+        text: loser === 'bot'
+          ? "ran out of time there. that one's yours - new game, you start"
+          : "time's up, that one's yours. new game?",
+        isUser: false,
+      });
+    }
+    // A fresh game has opened and the next move is theirs either way - but if the bot
+    // handed the opening back rather than playing into it, they have nothing to answer
+    // and the clock stays down.
+    turnRef.current = 'human';
+    if (!opensNext) startClock();
+  }, [API_URL, settlePending, startClock, stopClock]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
@@ -535,10 +609,18 @@ function Chat() {
     ]);
     const userInput = inputText;
     setInputText('');
+    let settled: ServerResponse | null = null;
+    // The clock does not stop, it changes hands: the bot is on it now.
+    turnRef.current = 'bot';
+    startClock();
 
     try {
+      const controller = new AbortController();
+      inFlight.current = controller;
+
       const response = await fetch(`${API_URL}/stream`, {
         method: 'POST',
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
         },
@@ -588,6 +670,7 @@ function Chat() {
       await typing;
 
       if (!data) throw new Error('stream ended without a result');
+      settled = data;
 
       // `link` is present only when the bot actually played a word, which is exactly
       // when there is something worth rating. `new_game` is deliberately not surfaced:
@@ -608,9 +691,21 @@ function Chat() {
       }
 
     } catch (error) {
-      console.error('Error:', error);
-      // Settle, don't append - otherwise the dots spin forever above the "?".
-      settlePending({ text: "?", isUser: false });
+      // An abort means the bot ran out its own clock and handleExpire has already
+      // settled the bubble with the forfeit - reporting "?" over the top would
+      // replace that with an error the player never hit.
+      if ((error as Error)?.name !== 'AbortError') {
+        console.error('Error:', error);
+        // Settle, don't append - otherwise the dots spin forever above the "?".
+        settlePending({ text: "?", isUser: false });
+      }
+    } finally {
+      // Back to them - including after an error, or the game would sit dead
+      // with no clock and no way to notice.
+      turnRef.current = 'human';
+      // An opening move is not a response, so it is not timed. Anything else is.
+      if (settled?.opening) stopClock(); else startClock();
+      inFlight.current = null;
     }
   };
 
@@ -654,6 +749,10 @@ function Chat() {
 
         await new Promise(resolve => setTimeout(resolve, 100));
       }
+
+      // No clock here. The intro ends on "u start...", which is an opening move -
+      // there is no word on the board yet, so there is nothing to answer and
+      // nothing to be slow about.
     };
 
     initializeChat();
@@ -842,6 +941,8 @@ function Chat() {
         }}
         // the traffic lights where a touch is far more likely to be a scroll.
         onDragStart={phone ? () => {} : startDrag}
+        clock={<TurnTimer deadline={deadline} duration={TURN_MS}
+                          onExpire={handleExpire} />}
       />
       <div
         ref={chatBoxRef}

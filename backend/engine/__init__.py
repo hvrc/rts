@@ -18,6 +18,6 @@ Inside:
 """
 
 from .state import SOLO_ID
-from .turn import play, play_stream, reset
+from .turn import play, play_stream, reset, timeout
 
-__all__ = ["play", "play_stream", "reset", "SOLO_ID"]
+__all__ = ["play", "play_stream", "reset", "timeout", "SOLO_ID"]

@@ -118,6 +118,24 @@ def reset():
     )), 200
 
 
+@app.route("/timeout", methods=["POST"])
+def timeout():
+    """The clock ran out on the human's turn.
+
+    Its own route rather than a magic message through /echo: running out of time is
+    something the client observed, not something the player typed, and faking it as a
+    message would write a sentence they never said into both the transcript and the
+    model's view of the conversation.
+    """
+    data = request.get_json(silent=True) or {}
+    who = data.get("who")
+    return jsonify(engine.timeout(
+        game_id=_game_id(data),
+        reverse=bool(data.get("reverse", False)),
+        who="bot" if who == "bot" else "human",
+    )), 200
+
+
 @app.route("/transcripts", methods=["GET"])
 def transcripts():
     """Recently active chats, newest first. `?chat_id=` returns one chat's messages."""

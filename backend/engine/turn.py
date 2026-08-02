@@ -95,6 +95,12 @@ def play(player_input, game_id=SOLO_ID, reverse=False, preferences=None, sink=No
     # nothing is obliged to render it - but it's tracked from the first turn, so whatever
     # decides to show it later has a history to show rather than starting from zero.
     payload["score"] = history.score(game.history, "human")
+
+    # Whether the human is now opening rather than answering. The clock is a response
+    # timer, and an opening move is not a response - there is no word on the board to
+    # connect to, so there is nothing to be slow about. Decided here rather than
+    # inferred from the reply text, which is the model's prose and not a fact.
+    payload["opening"] = game.last_word is None
     return payload
 
 
@@ -231,7 +237,7 @@ def _play(player_input, game_id, reverse, preferences, sink=None):
     # --- genuinely cornered: it gives up the round, and the game restarts ---
     if code == "CONCEDE":
         game.history.record(history.CONCEDED, "bot", game.last_word, history.EXPLICIT)
-        return _lose(game_id, rule, "CONCEDE", reply or "ok, you got me. new game - go")
+        return _lose(game_id, rule, "CONCEDE", reply or "ok, you got me. new game - you start")
 
     # --- a real repeat the deterministic pre-check couldn't see (an irregular plural,
     #     or a word buried in prose) ---
@@ -254,7 +260,7 @@ def _play(player_input, game_id, reverse, preferences, sink=None):
 
             if code != "OK" or not _legal(chosen, rule, spent):
                 # Cornered even after a retry. The AI loses; new game.
-                return _lose(game_id, rule, "CONCEDE", "ok, you got me. new game - go")
+                return _lose(game_id, rule, "CONCEDE", "ok, you got me. new game - you start")
 
         # --- 4. legal both ways: advance the chain ---
         # What they *played*, not what they typed. Falls back to the raw text only when
@@ -298,6 +304,69 @@ def _lose(game_id, rule, code, message):
     letter rule carries over, since that's a client toggle, not part of the game."""
     GAMES.reset(game_id, rule.reverse)
     return contract.contract(code, message, new_game=True)
+
+
+def timeout(game_id=SOLO_ID, reverse=False, who="human"):
+    """The clock ran out with nothing said. The round is lost and a new game opens.
+
+    Deliberately a separate entry point rather than a message the client fakes: running
+    out of time is a fact the client observes, not something the human typed, and
+    routing it through /echo would put an invented sentence in the transcript and in
+    the model's conversation history.
+
+    The wording is the model's, the consequence is not - same split as a rule break. It
+    is told what happened and asked to open the next game; the reset and the new word
+    happen here regardless of what it says back.
+    """
+    game = GAMES.get(game_id)
+    if game.rule.reverse != bool(reverse):
+        game.set_reverse(reverse)
+    rule = game.rule
+
+    if who == "bot":
+        # The bot ran out its own clock. Answered without the model on purpose: the
+        # thing that just failed is the model being slow, and asking it to comment on
+        # that would mean waiting on the same call all over again. It loses the round
+        # and hands the opening back, which is what it does whenever it is beaten.
+        game.history.record(history.CONCEDED, "bot", game.last_word, history.TIMED_OUT)
+        payload = _lose(game_id, rule, "TIMEOUT",
+                        "ran out of time there. that one's yours - new game, you start")
+        GAMES.get(game_id).remember("assistant", payload["response"])
+        payload["score"] = history.score(GAMES.get(game_id).history, "human")
+        payload["opening"] = GAMES.get(game_id).last_word is None
+        transcript.record_turn(game_id, "(bot timed out)", payload, reverse=rule.reverse)
+        return payload
+
+    game.history.record(history.CONCEDED, "human", game.last_word, history.TIMED_OUT)
+
+    note = ("their time ran out and they said nothing. Say time is up and the round is "
+            "theirs to lose, then ask if they want another game and stop there. Do NOT "
+            "play a word - the board is theirs to open or hand back, and barging in with "
+            "one answers a question you just asked. Leave chosen_word empty. One short "
+            "lowercase line.")
+    try:
+        data = _ask(game, "(no answer - the clock ran out)",
+                    correction=note, spent=game.used)
+    except Exception:                                   # noqa: BLE001
+        data = {}
+
+    # Board wiped, nothing played onto it. Whoever moves next decides how the game
+    # starts: a word opens it, "yes" hands the opening to the bot - and both of those
+    # are ordinary turns that _play already knows how to answer, so nothing here needs
+    # to guess which one is coming.
+    GAMES.reset(game_id, rule.reverse)
+    payload = contract.contract(
+        "TIMEOUT",
+        (data.get("response") or "").strip() or "time's up, that one's yours. new game?",
+        new_game=True,
+    )
+
+    game = GAMES.get(game_id)
+    game.remember("assistant", payload.get("response", ""))
+    payload["score"] = history.score(game.history, "human")
+    payload["opening"] = game.last_word is None
+    transcript.record_turn(game_id, "(timed out)", payload, reverse=rule.reverse)
+    return payload
 
 
 def _restart(game_id, rule, data, reply):

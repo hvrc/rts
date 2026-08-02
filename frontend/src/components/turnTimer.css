@@ -1,0 +1,50 @@
+/* The turn clock, top right - opposite the traffic lights, which own the left. */
+
+.rts-timer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+/* Present but empty between turns, so the header doesn't reflow every time the clock
+   starts and stops. */
+.rts-timer.is-idle {
+  opacity: 0.28;
+}
+
+.rts-timer-track {
+  stroke: currentColor;
+  opacity: 0.18;
+}
+
+.rts-timer-arc {
+  /* No transition on the offset: the arc is redrawn every frame, and easing between
+     frames would lag the clock it is supposed to be reporting. The colour does ease,
+     so the changes read as the clock warming up rather than as three separate icons. */
+  transition: stroke 0.4s ease;
+
+  /* White reads on the dark glass but disappears on the pale one, so it carries its own
+     shadow. Cheaper and steadier than swapping the colour per theme, which would mean
+     "white" only sometimes meant white. */
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.45));
+}
+
+.rts-timer.is-calm   .rts-timer-arc { stroke: #ffffff; }
+.rts-timer.is-warn   .rts-timer-arc { stroke: #ffc53d; }
+.rts-timer.is-urgent .rts-timer-arc { stroke: #ff4d4f; }
+
+.rts-timer.is-urgent {
+  animation: rts-timer-pulse 1s ease-in-out infinite;
+}
+
+@keyframes rts-timer-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rts-timer.is-urgent { animation: none; }
+}

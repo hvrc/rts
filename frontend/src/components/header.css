@@ -22,6 +22,14 @@
   user-select: none;
 }
 
+/* Pushes the clock to the far right, so the lights keep the left edge and the
+   two never crowd each other however wide the window gets. */
+.rts-header-spacer { flex: 1; }
+
+/* The bar has no right padding of its own - the lights only need the left - so
+   the clock brings its own. */
+.rts-header .rts-timer { margin-right: 12px; }
+
 .rts-window.is-dragging .rts-header { cursor: grabbing; }
 
 /* The lights stay clickable - startDrag bails on any button target. */
