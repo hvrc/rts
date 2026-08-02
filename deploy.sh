@@ -41,6 +41,28 @@ PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format='value(proje
 RUNTIME_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
 gcloud config set project "${PROJECT_ID}" >/dev/null
 
+# The token that gates /database and /transcripts. Those are every conversation anyone
+# has ever had with this thing, so the deployed default is closed.
+#
+# Carried forward from whatever is already running rather than re-specified each time:
+# --set-env-vars replaces the entire environment, so a token set once by hand would be
+# silently wiped by the next deploy - and the failure is invisible, because the service
+# comes up perfectly and simply stops asking. Pass RTS_TRANSCRIPT_TOKEN to change it,
+# or RTS_TRANSCRIPT_TOKEN= (empty) to deliberately open it up.
+deployed_token() {
+  gcloud run services describe "${BACKEND_SERVICE}" --region "${REGION}" --format=json \
+    2>/dev/null | python3 -c '
+import json, sys
+try:
+    env = json.load(sys.stdin)["spec"]["template"]["spec"]["containers"][0].get("env", [])
+    print(next((e.get("value", "") for e in env if e["name"] == "RTS_TRANSCRIPT_TOKEN"), ""))
+except Exception:
+    print("")
+' 2>/dev/null || echo ""
+}
+
+TRANSCRIPT_TOKEN="${RTS_TRANSCRIPT_TOKEN-$(deployed_token)}"
+
 verify() {
   local burl="$1" furl="$2" expected_api="$3" fail=0
   echo "── Verifying ───────────────────────────────────────────────"
@@ -72,6 +94,20 @@ verify() {
         | sort -u | tr '\n' ' ')"
       fail=1
     fi
+  fi
+
+  # The archive is every conversation anyone has had. Asserted rather than assumed,
+  # because an unlocked one looks identical to a locked one until somebody finds it.
+  local code
+  code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "${burl}/database")"
+  if [ -n "${TRANSCRIPT_TOKEN}" ]; then
+    if [ "${code}" = "403" ]; then
+      echo "  OK   /database is gated (403 without a token)"
+    else
+      echo "  FAIL /database answered ${code} with no token - the archive is OPEN"; fail=1
+    fi
+  else
+    echo "  WARN /database is public (no RTS_TRANSCRIPT_TOKEN set)"
   fi
 
   [ "${fail}" -eq 0 ] && echo "Verified live." || { echo "VERIFICATION FAILED"; return 1; }
@@ -109,7 +145,7 @@ gcloud run deploy "${BACKEND_SERVICE}" \
   --source backend --region "${REGION}" --allow-unauthenticated \
   --min-instances 0 --max-instances 1 --cpu 1 --memory 512Mi --port 8080 --timeout 120 \
   --set-secrets "ANTHROPIC_API_KEY=${SECRET}:latest" \
-  --set-env-vars "CORS_ORIGINS=https://${CUSTOM_DOMAIN},RTS_FIRESTORE_DB=${FIRESTORE_DB}" \
+  --set-env-vars "CORS_ORIGINS=https://${CUSTOM_DOMAIN},RTS_FIRESTORE_DB=${FIRESTORE_DB},RTS_TRANSCRIPT_TOKEN=${TRANSCRIPT_TOKEN}" \
   --quiet
 BURL="$(gcloud run services describe "${BACKEND_SERVICE}" --region "${REGION}" --format='value(status.url)')"
 echo "Backend URL: ${BURL}"
