@@ -11,6 +11,7 @@ original game.
 
 import json
 import os
+from queue import Empty
 
 from dotenv import load_dotenv
 from flask import Flask, Response, request, jsonify
@@ -32,7 +33,7 @@ if not os.environ.get("ANTHROPIC_API_KEY") and os.environ.get("GOOGLE_CLOUD_PROJ
     )
 
 import engine  # noqa: E402  (import after the key is in env so the client sees it)
-from engine import transcript  # noqa: E402
+from engine import bus, transcript  # noqa: E402
 
 app = Flask(__name__)
 
@@ -134,6 +135,158 @@ def timeout():
         reverse=bool(data.get("reverse", False)),
         who="bot" if who == "bot" else "human",
     )), 200
+
+
+# ---------------------------------------------------------------------------
+# rooms
+# ---------------------------------------------------------------------------
+#
+# A room is the same game with more people in it. The shape here is deliberately
+# boring - REST for anything a client does, one server-sent event stream for
+# everything that happens *to* it. A room is the first place in this app where the
+# interesting events aren't replies to a request: somebody else types, the clock runs
+# out, the bot takes its turn.
+
+def _who(data):
+    """The player behind a request. No account, no password - a display name and an id
+    the browser generated and keeps, which is enough to be the same person on reload
+    and enough for the bot to address you by name."""
+    return (str(data.get("user_id") or "").strip()[:64],
+            str(data.get("name") or "").strip()[:24])
+
+
+def _room_or_404(room_id):
+    room = engine.ROOMS.get(room_id)
+    if room is None:
+        return None, (jsonify({"error": "no such room"}), 404)
+    return room, None
+
+
+@app.route("/rooms", methods=["GET"])
+def rooms_list():
+    return jsonify({"rooms": engine.ROOMS.list()}), 200
+
+
+@app.route("/rooms", methods=["POST"])
+def rooms_create():
+    data = request.get_json(silent=True) or {}
+    user_id, name = _who(data)
+    if not user_id:
+        return jsonify({"error": "user_id required"}), 400
+
+    room = engine.roomturn.create(
+        data.get("room_name") or data.get("name") or "room",
+        bot=data.get("bot", True),
+        timer=data.get("timer", True),
+        reverse=bool(data.get("reverse", False)),
+    )
+    member = engine.roomturn.join(room, user_id, name)
+    return jsonify({"room": room.state(), "you": member.public(),
+                    "messages": room.log}), 200
+
+
+@app.route("/rooms/<room_id>", methods=["GET"])
+def rooms_get(room_id):
+    room, missing = _room_or_404(room_id)
+    if missing:
+        return missing
+    return jsonify({"room": room.state(), "messages": room.log}), 200
+
+
+@app.route("/rooms/<room_id>/join", methods=["POST"])
+def rooms_join(room_id):
+    room, missing = _room_or_404(room_id)
+    if missing:
+        return missing
+    data = request.get_json(silent=True) or {}
+    user_id, name = _who(data)
+    if not user_id:
+        return jsonify({"error": "user_id required"}), 400
+    member = engine.roomturn.join(room, user_id, name)
+    return jsonify({"room": room.state(), "you": member.public(),
+                    "messages": room.log}), 200
+
+
+@app.route("/rooms/<room_id>/leave", methods=["POST"])
+def rooms_leave(room_id):
+    room, missing = _room_or_404(room_id)
+    if missing:
+        return missing
+    user_id, _ = _who(request.get_json(silent=True) or {})
+    engine.roomturn.leave(room, user_id)
+    return jsonify({"ok": True}), 200
+
+
+@app.route("/rooms/<room_id>/say", methods=["POST"])
+def rooms_say(room_id):
+    """Post a message. The reply, if there is one, arrives over the event stream.
+
+    Nothing is returned but an ack on purpose: in a room the answer isn't owed to the
+    person who spoke, it's owed to everyone in there, and it may well arrive after
+    somebody else has already said something. One delivery path for every message,
+    whoever it was meant for.
+    """
+    room, missing = _room_or_404(room_id)
+    if missing:
+        return missing
+    data = request.get_json(silent=True) or {}
+    user_id, _ = _who(data)
+    try:
+        message = engine.roomturn.say(room, user_id, data.get("message", ""))
+    except KeyError:
+        return jsonify({"error": "you are not in this room"}), 409
+    return jsonify({"ok": True, "message": message}), 200
+
+
+@app.route("/rooms/<room_id>/settings", methods=["POST"])
+def rooms_settings(room_id):
+    room, missing = _room_or_404(room_id)
+    if missing:
+        return missing
+    data = request.get_json(silent=True) or {}
+    engine.roomturn.configure(
+        room,
+        bot=data.get("bot"),
+        timer=data.get("timer"),
+        reverse=data.get("reverse"),
+    )
+    return jsonify({"room": room.state()}), 200
+
+
+@app.route("/rooms/<room_id>/events", methods=["GET"])
+def rooms_events(room_id):
+    """Everything that happens in this room, as it happens.
+
+    Server-sent events for the same reasons /stream uses them: one-way traffic, one
+    `ReadableStream` on the client, and it survives the proxies an ordinary GET does.
+
+    The stream opens with the room's current state so a client that has just connected
+    is never drawing a room from before it arrived, and heartbeats every 20 seconds so
+    an idle room's connection isn't dropped by something in the middle.
+    """
+    room, missing = _room_or_404(room_id)
+    if missing:
+        return missing
+
+    def events():
+        queue = bus.BUS.subscribe(room_id)
+        try:
+            yield f"event: state\ndata: {json.dumps(room.state())}\n\n"
+            while True:
+                try:
+                    kind, payload = queue.get(timeout=20)
+                except Empty:
+                    yield ": ping\n\n"
+                    continue
+                yield f"event: {kind}\ndata: {json.dumps(payload)}\n\n"
+        finally:
+            bus.BUS.unsubscribe(room_id, queue)
+
+    return Response(events(), mimetype="text/event-stream", headers={
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",
+        "Connection": "keep-alive",
+    })
 
 
 @app.route("/transcripts", methods=["GET"])

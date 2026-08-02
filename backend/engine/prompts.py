@@ -6,7 +6,9 @@ those to change how the bot plays, and nothing here needs to be touched.
   prompts/identity.md      who the bot is. persona and epistemics. no rules.
   prompts/game.md          what RTS is, plus the {{LETTER_RULE}} slot and the name lore
   prompts/judging.md       how to think about relatedness
+  prompts/language.md      playing across languages, and why a translation isn't a move
   prompts/conversation.md  reading the human, turn-taking, requests
+  prompts/room.md          appended only in a room: names, seats, staying out of the way
   prompts/letter_rule.*.md the active letter rule, spliced into game.md
 
 The split is by *concern*, so the voice can change without touching the rules and the
@@ -26,25 +28,29 @@ from . import history, reading
 _DIR = Path(__file__).parent / "prompts"
 
 # Order matters: who you are, then what the game is, then how to judge, then how to talk.
-_LAYERS = ("identity.md", "game.md", "judging.md", "conversation.md")
+_LAYERS = ("identity.md", "game.md", "judging.md", "language.md", "conversation.md")
 
 
 def _read(name):
     return (_DIR / name).read_text(encoding="utf-8").strip()
 
 
-def system_prompt(rule):
+def system_prompt(rule, room=False):
     """The full system prompt, with the active letter rule spliced in.
 
-    Stable for the whole session - nothing per-turn belongs in here.
+    Stable for the whole session - nothing per-turn belongs in here. The room layer is
+    appended rather than interleaved so that solo play's prefix is byte-identical to
+    what it was, and a room's prefix is stable for as long as the room lasts. Either
+    way the cache sees one fixed string.
     """
     rule_block = _read("letter_rule.reverse.md" if rule.reverse else "letter_rule.normal.md")
-    return "\n\n".join(_read(name) for name in _LAYERS).replace(
+    layers = _LAYERS + (("room.md",) if room else ())
+    return "\n\n".join(_read(name) for name in layers).replace(
         "{{LETTER_RULE}}", rule_block
     )
 
 
-def messages(game, player_input, correction=None, preferences=None):
+def messages(game, player_input, correction=None, preferences=None, room=None):
     """The conversation, as the model should see it.
 
     Real message history, rather than a synthesised description of it. Without this the
@@ -59,13 +65,30 @@ def messages(game, player_input, correction=None, preferences=None):
     out = [{"role": role, "content": text} for role, text in game.transcript]
     out.append({
         "role": "user",
-        "content": _turn_block(game, player_input, correction, preferences),
+        "content": _turn_block(game, player_input, correction, preferences, room),
     })
     return out
 
 
-def _turn_block(game, player_input, correction=None, preferences=None):
-    lines = [
+def _turn_block(game, player_input, correction=None, preferences=None, room=None):
+    lines = []
+
+    # Who is here, and whose go it is. First, because in a room it's the thing that
+    # decides whether this message is even addressed to you.
+    if room is not None:
+        here = ", ".join(f"{name}{' (you)' if is_bot else ''}"
+                         for name, is_bot in room.seated())
+        lines += [
+            "<room>",
+            f"room: {room.name}",
+            f"here: {here or '(just you)'}",
+            f"whose turn: {room.named(room.turn)}"
+            + (" - that's you" if room.bot_turn else ""),
+            "</room>",
+            "",
+        ]
+
+    lines += [
         "<board>",
         "chain: " + (" -> ".join(game.chain) if game.chain
                      else "(empty - nothing played yet this game)"),
@@ -118,14 +141,21 @@ def _turn_block(game, player_input, correction=None, preferences=None):
     if taste:
         lines += ["", "<their_taste>", taste, "</their_taste>"]
 
-    lines += ["", f'they just said: "{player_input}"']
+    if player_input:
+        lines += ["", f'they just said: "{player_input}"']
 
-    # Observations, not instructions. The last thing that read the shape of a message
-    # decided from it, and forced any single word to be a move - right often enough to
-    # look fine, wrong exactly where it mattered. Noticing is safe; concluding wasn't.
-    noticed = reading.observe(player_input, game.pending)
-    if noticed:
-        lines += ["", f"(worth noticing: {noticed}. Your call either way.)"]
+        # Observations, not instructions. The last thing that read the shape of a
+        # message decided from it, and forced any single word to be a move - right
+        # often enough to look fine, wrong exactly where it mattered. Noticing is
+        # safe; concluding wasn't.
+        noticed = reading.observe(player_input, game.pending)
+        if noticed:
+            lines += ["", f"(worth noticing: {noticed}. Your call either way.)"]
+    else:
+        # A room's turn, where several people may have spoken since the bot's last go.
+        # There is no single "they" to quote, and picking the most recent speaker would
+        # aim the answer at whoever happened to type last rather than at the board.
+        lines += ["", "it's your turn. Play a word off the one in play."]
 
     if correction:
         lines += ["", f"NOTE: {correction}"]

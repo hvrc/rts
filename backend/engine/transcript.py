@@ -39,8 +39,14 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 # Column order shared by both stores, so a row means the same thing either way.
+#
+# `user_id` and `user_name` are null for every solo row and set for every room row. A
+# solo game has exactly two participants and `role` tells them apart; a room has as
+# many as walked in, and "which human" is the question you actually want to ask of a
+# multiplayer transcript afterwards.
 FIELDS = ("message_id", "chat_id", "seq", "ts", "role", "type", "text", "word",
-          "link_from", "link_to", "reverse", "new_game", "latency_ms", "thoughts")
+          "link_from", "link_to", "reverse", "new_game", "latency_ms", "thoughts",
+          "user_id", "user_name")
 
 _SQLITE_PATH = os.environ.get(
     "RTS_TRANSCRIPT_DB",
@@ -96,7 +102,9 @@ class _Sqlite:
         reverse     INTEGER NOT NULL,      -- which letter rule was in force
         new_game    INTEGER NOT NULL DEFAULT 0,
         latency_ms  INTEGER,               -- bot rows only: how long the turn took
-        thoughts    INTEGER                -- was a train of thought asked for?
+        thoughts    INTEGER,               -- was a train of thought asked for?
+        user_id     TEXT,                  -- room rows only: which player said it
+        user_name   TEXT                   -- their display name at the time
     );
     CREATE INDEX IF NOT EXISTS messages_by_chat ON messages(chat_id, seq);
     CREATE INDEX IF NOT EXISTS messages_by_time ON messages(ts);
@@ -113,8 +121,22 @@ class _Sqlite:
             Path(self._path).parent.mkdir(parents=True, exist_ok=True)
             self._conn = sqlite3.connect(self._path, check_same_thread=False)
             self._conn.executescript(self._SCHEMA)
+            self._migrate(self._conn)
             self._conn.commit()
         return self._conn
+
+    @staticmethod
+    def _migrate(conn):
+        """Add columns a database written by an older build doesn't have yet.
+
+        CREATE TABLE IF NOT EXISTS is a no-op on an existing table, so a new column in
+        the schema above never reaches a file that already exists - and the insert then
+        fails against every database anyone has been collecting runs in.
+        """
+        have = {row[1] for row in conn.execute("PRAGMA table_info(messages)")}
+        for column in ("user_id", "user_name"):
+            if column not in have:
+                conn.execute(f"ALTER TABLE messages ADD COLUMN {column} TEXT")
 
     def append(self, chat_id, rows):
         with self._lock:
@@ -248,6 +270,45 @@ def enabled():
 # ---------------------------------------------------------------------------
 # api
 # ---------------------------------------------------------------------------
+
+#: Every optional column, nulled. Spelled out once so a new field can't be added to
+#: FIELDS and then quietly missing from one of the two writers below.
+_BLANK = {f: None for f in FIELDS}
+_BLANK["new_game"] = 0
+
+
+def record_message(chat_id, *, role, type, text, reverse=False, user_id=None,
+                   user_name=None, word=None, link=None, latency_ms=None):
+    """Write one message.
+
+    Rooms produce messages one at a time - somebody speaks, and much later somebody
+    else does - where a solo game produces them strictly in pairs. Same table, same
+    columns, so one query reads both kinds back; only the arrival pattern differs.
+    """
+    if not enabled():
+        return
+    try:
+        link = link or {}
+        store().append(chat_id, [{
+            **_BLANK,
+            "message_id": uuid.uuid4().hex,
+            "chat_id": chat_id,
+            "ts": datetime.now(timezone.utc).isoformat(timespec="milliseconds"),
+            "role": role,
+            "type": type,
+            "text": text or "",
+            "word": word or link.get("to"),
+            "link_from": link.get("from"),
+            "link_to": link.get("to"),
+            "reverse": int(bool(reverse)),
+            "latency_ms": latency_ms,
+            "user_id": user_id,
+            "user_name": user_name,
+        }])
+    except Exception:                                   # noqa: BLE001
+        log.exception("could not record message for chat %s", chat_id)
+
+
 def record_turn(chat_id, player_input, payload, reverse, latency_ms=None,
                 thoughts=None):
     """Write both halves of one exchange.
@@ -260,9 +321,8 @@ def record_turn(chat_id, player_input, payload, reverse, latency_ms=None,
     try:
         now = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
         link = payload.get("link") or {}
-        base = {"chat_id": chat_id, "ts": now, "reverse": int(bool(reverse)),
-                "word": None, "link_from": None, "link_to": None, "new_game": 0,
-                "latency_ms": None, "thoughts": None, "seq": None}
+        base = {**_BLANK, "chat_id": chat_id, "ts": now,
+                "reverse": int(bool(reverse))}
 
         rows = [
             # What they said, verbatim - not the model's normalised reading of it. The

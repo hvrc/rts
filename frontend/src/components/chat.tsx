@@ -1,10 +1,18 @@
 import React from 'react';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import './chat.css';
 import '../skins/aqua.css';
 import Header from './Header';
 import Rating from './Rating';
+import Rooms from './Rooms';
 import TurnTimer from './TurnTimer';
+import {
+  Rooms as RoomsApi,
+  userId,
+  type Member,
+  type RoomMessage,
+  type RoomState,
+} from '../lib/rooms';
 import { gameId, loadPrefs, ratePair, type Link, type Rating as RatingValue } from '../lib/prefs';
 import { applyAccent, isAccentId, sampleWallpaperAccent, DEFAULT_ACCENT, type AccentId } from '../lib/accent';
 import {
@@ -28,6 +36,26 @@ interface Message {
   // Set once streamed text starts arriving in that bubble: still pending (the turn
   // isn't settled), but no longer showing dots.
   streaming?: boolean;
+
+  // --- rooms only ---------------------------------------------------------
+  /** Who said it. Drawn above the bubble, and only when the speaker changes. */
+  who?: string;
+  /** The room talking about itself - joins, leaves, settings. Not a bubble. */
+  note?: boolean;
+  /** Said, but it didn't count: out of turn, or against the rules. */
+  void?: boolean;
+}
+
+/** A room message as this component wants to draw it. */
+function asMessage(m: RoomMessage, me: string): Message {
+  return {
+    text: m.text,
+    isUser: m.user_id === me,
+    who: m.kind === 'system' ? undefined : m.name || undefined,
+    note: m.kind === 'system',
+    void: !!m.flag,
+    link: m.link || undefined,
+  };
 }
 
 interface WordState {
@@ -177,9 +205,26 @@ function Chat() {
   // tap to appear; on desktop hover already handles it and this is inert.
   const [tapped, setTapped] = useState<number | null>(null);
 
-  // The three header toggles.
-  const [showThoughtProcess, setShowThoughtProcess] = useState(false); // s
-  const [reverse, setReverse] = useState(false);                       // r
+  // The three header toggles: r opens the lobby, t is the theme, s flips the letters.
+  const [reverse, setReverse] = useState(false);                       // s
+  const [lobby, setLobby] = useState(false);                           // r
+
+  /* Kept, and permanently off. The train of thought still renders - the animation
+     below is untouched - but nothing turns it on any more: it was the largest field
+     the model wrote, generated on every single turn, for something almost nobody
+     opened. Deleting it would throw away work that only needs a switch to come back. */
+  const [showThoughtProcess] = useState(false);
+
+  /* The room you're in, or null for solo play. `roomMsgs` is kept apart from
+     `messages` rather than replacing it so that stepping into a room and back out
+     doesn't destroy the game you had going. */
+  const [room, setRoom] = useState<RoomState | null>(null);
+  const [roomMsgs, setRoomMsgs] = useState<Message[]>([]);
+  const [botThinking, setBotThinking] = useState(false);
+  const [roomBarOpen, setRoomBarOpen] = useState(false);
+  const rooms = useMemo(() => new RoomsApi(API_URL), [API_URL]);
+  const me = useMemo(() => userId(), []);
+  const inRoom = room !== null;
 
   // Dark mode is a tri-state preference (`t`), resolved to a boolean for the DOM.
   const [darkPref, setDarkPref] = useState<DarkModePreference>(initialDarkPreference);
@@ -203,6 +248,10 @@ function Chat() {
      close over whichever turn it was created in. */
   const turnRef = useRef<'human' | 'bot'>('human');
   const inFlight = useRef<AbortController | null>(null);
+
+  /* Same reason as turnRef: the expiry callback is held by an animation frame, so it
+     has to be able to see whether there's a room *now* rather than when it was made. */
+  const roomRef = useRef<RoomState | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const latestBotMessageRef = useRef<HTMLDivElement>(null);
@@ -331,6 +380,7 @@ function Chat() {
   // value; the ref always has the current one.
   const reverseRef = useRef(reverse);
   useEffect(() => { reverseRef.current = reverse; }, [reverse]);
+  useEffect(() => { roomRef.current = room; }, [room]);
 
   // Theme lives on <html> so index.css can drive every color from one attribute.
   useEffect(() => {
@@ -463,7 +513,7 @@ function Chat() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, roomMsgs]);
 
   // Flipping the rule does not restart the game - the chain survives, and the new rule
   // governs every word from here on. The bot just says so.
@@ -472,13 +522,55 @@ function Chat() {
   const toggleReverse = useCallback(async () => {
     const next = !reverse;
     setReverse(next);
+
+    // In a room the rule belongs to the room, not to you - so it goes to the server,
+    // which announces it to everybody. Flipping it locally would leave the person who
+    // pressed it playing a different game from everyone else.
+    if (room) {
+      rooms.settings(room.id, { reverse: next }).catch(() => setReverse(reverse));
+      return;
+    }
+
     setMessages(m => [...m, { text: '', isUser: false }]);
     await announce(
       next
         ? "new rules... every word has to start with r t or s now, no other letters allowed"
         : "new rules... back to normal. no word can start with r, t or s"
     );
-  }, [reverse]);
+  }, [reverse, room, rooms]);
+
+  /**
+   * `r`. The window turns round: the chat becomes the lobby, and back.
+   *
+   * From inside a room it steps out to the lobby rather than straight to solo play,
+   * because the reason to leave a room is nearly always to go to a different one.
+   */
+  const toggleRooms = useCallback(() => {
+    if (room) {
+      rooms.leave(room.id);
+      setRoom(null);
+      setRoomMsgs([]);
+      setRoomBarOpen(false);
+      setLobby(true);
+      return;
+    }
+    setLobby(open => !open);
+  }, [room, rooms]);
+
+  /* Room settings live behind a hold on `r`, the same way appearance lives behind a
+     hold on `t`. They belong to the room rather than to you, so changing one is
+     announced to everybody - which is also why they aren't in a menu only you can see. */
+  const setRoomSetting = useCallback((patch: { bot?: boolean; timer?: boolean }) => {
+    if (room) rooms.settings(room.id, patch).catch(() => {});
+  }, [room, rooms]);
+
+  /** Somebody got into a room. Everything from here arrives on its event stream. */
+  const enterRoom = useCallback((state: RoomState, log: RoomMessage[], _you: Member) => {
+    setRoom(state);
+    setRoomMsgs(log.map(m => asMessage(m, me)));
+    setReverse(state.reverse);
+    setLobby(false);
+  }, [me]);
 
   // Rating is on the link, not the word: "war" alone teaches the bot nothing, but
   // "from peace it leapt to war, and I liked that" is a taste it can act on. Saved to
@@ -495,9 +587,44 @@ function Chat() {
     setDarkPref(effectiveDark(darkPref) ? 'light' : 'dark');
   }, [darkPref]);
 
-  const toggleThoughts = useCallback(() => {
-    setShowThoughtProcess(prev => !prev);
-  }, []);
+  /**
+   * Stay subscribed to the room for as long as you're in it.
+   *
+   * Everything the room does arrives here - other people's messages, the bot's turn,
+   * the clock changing hands - because none of it was caused by anything this browser
+   * asked for. Your own messages come back the same way rather than being echoed
+   * locally, so there is exactly one thing deciding what the room looks like.
+   */
+  useEffect(() => {
+    if (!room) return;
+    const id = room.id;
+
+    const stop = rooms.watch(id, {
+      message: (m) => {
+        setBotThinking(false);
+        setRoomMsgs(prev => [...prev, asMessage(m, me)]);
+      },
+      state: (s) => {
+        setRoom(s);
+        setReverse(s.reverse);
+        // The room owns the clock, including the expiry: with round-robin the current
+        // player can have closed their laptop, and a countdown owned by their browser
+        // would then never fire. This just draws what the server says.
+        setDeadline(s.deadline_ms);
+      },
+      thinking: () => setBotThinking(true),
+    });
+
+    // A closing tab has to say so, or it stays seated in the rotation and every lap
+    // stalls for twenty seconds on somebody who has gone.
+    const bye = () => rooms.leave(id);
+    window.addEventListener('pagehide', bye);
+
+    return () => {
+      window.removeEventListener('pagehide', bye);
+      stop();
+    };
+  }, [room?.id, rooms, me]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * Swap the waiting bubble for the real reply. The placeholder is the one message in
@@ -551,6 +678,11 @@ function Chat() {
    * conversation.
    */
   const handleExpire = useCallback(async () => {
+    // In a room the clock is the server's. It is already counting the same twenty
+    // seconds and will announce the skip to everyone at once; a client that also
+    // reported the expiry would be racing the four other browsers doing the same.
+    if (roomRef.current) return;
+
     stopClock();
     const loser = turnRef.current;
     // A forfeit can leave either side to open; the server says which.
@@ -599,6 +731,22 @@ function Chat() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
+
+    /* In a room, sending is all this does. The message comes back over the event
+       stream like everyone else's, and the answer - if there is one - may well arrive
+       after somebody else has already spoken. Echoing it locally as well would put it
+       on screen twice and make this browser's copy of the room the one that disagrees
+       with the other four. */
+    if (room) {
+      const text = inputText;
+      setInputText('');
+      try {
+        await rooms.say(room.id, text);
+      } catch {
+        setInputText(text);      // hand it back rather than swallowing what they typed
+      }
+      return;
+    }
 
     // The bot starts "thinking" the instant you hit send, in every mode - not only when
     // the train of thought is on.
@@ -886,6 +1034,14 @@ function Chat() {
     }
   };
 
+  /* What's on screen: the room's messages, or the solo game's. In a room the bot gets
+     a placeholder bubble while it's thinking, exactly as it does solo - it just comes
+     from the room telling everyone at once rather than from this browser knowing it
+     asked. */
+  const shown = inRoom
+    ? (botThinking ? [...roomMsgs, { text: '', isUser: false, pending: true }] : roomMsgs)
+    : messages;
+
   return (
     <div
       ref={windowRef}
@@ -925,9 +1081,9 @@ function Chat() {
         />
       ))}
       <Header
-        reverse={{ on: reverse, toggle: toggleReverse }}
+        rooms={{ on: lobby || inRoom, toggle: toggleRooms }}
         theme={{ on: isDark, toggle: toggleTheme }}
-        thoughts={{ on: showThoughtProcess, toggle: toggleThoughts }}
+        reverse={{ on: reverse, toggle: toggleReverse }}
         appearance={{
           open: appearanceOpen,
           toggleOpen: () => setAppearanceOpen((o) => !o),
@@ -941,8 +1097,38 @@ function Chat() {
         }}
         // the traffic lights where a touch is far more likely to be a scroll.
         onDragStart={phone ? () => {} : startDrag}
+        // Whose go it is, next to the clock that's counting it down. Only in a room:
+        // solo, the clock alone says it, because there are only two of you.
+        turn={room?.turn_name ? (
+          <div className={`rts-turn${room.turn === me ? ' is-you' : ''}`}>
+            {room.turn === me ? 'your go' : room.turn_name}
+          </div>
+        ) : undefined}
         clock={<TurnTimer deadline={deadline} duration={TURN_MS}
                           onExpire={handleExpire} />}
+        onHoldRooms={inRoom ? () => setRoomBarOpen(o => !o) : undefined}
+        roomBar={room && roomBarOpen ? (
+          <div className="rts-appearance rts-roombar">
+            <div className="rts-roombar-name">
+              {room.name}
+              <span className="rts-roombar-who">
+                {room.members.map(m => m.name).join(', ')}
+              </span>
+            </div>
+            <div className="rts-skins">
+              <button type="button" aria-pressed={room.bot}
+                      className={`rts-skin${room.bot ? ' is-on' : ''}`}
+                      onClick={() => setRoomSetting({ bot: !room.bot })}>
+                bot
+              </button>
+              <button type="button" aria-pressed={room.timer}
+                      className={`rts-skin${room.timer ? ' is-on' : ''}`}
+                      onClick={() => setRoomSetting({ timer: !room.timer })}>
+                clock
+              </button>
+            </div>
+          </div>
+        ) : undefined}
       />
       <div
         ref={chatBoxRef}
@@ -1006,59 +1192,82 @@ function Chat() {
               ))}
             </div>
           )}
-          {messages.map((message, index) => (
-            <div
-              key={index}
-              // `is-tapped` is what reveals the thumbs on touch, where there is no hover.
-              className={`rts-msg ${message.isUser ? 'is-user' : 'is-bot'}${tapped === index ? ' is-tapped' : ''}`}
-              onClick={message.link ? () => setTapped(t => (t === index ? null : index)) : undefined}
-              ref={!message.isUser && index === messages.length - 1 ? latestBotMessageRef : null}
-            >
-              <div className="rts-msg-body">
-                {message.isUser && message.showQuestionMark && (
-                  <div className="question-mark-circle">
-                    ?
-                  </div>
-                )}
-                <div className={`rts-bubble${message.isUser ? ' is-user' : ''}`}>
-                  {/* Dots while the request is in flight and while the train of thought
-                      is still narrowing down - but not once streamed text has started
-                      landing in this bubble, which replaces them. */}
-                  {(message.pending && !message.streaming)
-                   || (!message.isUser && index === messages.length - 1
-                       && isTyping && showThoughtProcess) ? (
-                    <div className="typing-indicator">
-                      <span></span>
-                      <span></span>
-                      <span></span>
+          {lobby ? (
+            <Rooms api={rooms} onEnter={enterRoom} reverse={reverse} />
+          ) : shown.map((message, index) => {
+            // The room talking about itself. A caption, not a bubble - nobody said it.
+            if (message.note) {
+              return <div key={index} className="rts-note">{message.text}</div>;
+            }
+
+            /* The name goes above the bubble only when the speaker changes, so a run
+               of messages from one person reads as one person talking rather than as a
+               column of labels. Your own messages never get one: they're on your side
+               of the window, which already says who sent them. */
+            const previous = shown[index - 1];
+            const heading = message.who && !message.isUser
+              && !(previous && previous.who === message.who && !previous.note)
+              ? message.who : null;
+
+            return (
+              <div
+                key={index}
+                // `is-tapped` is what reveals the thumbs on touch, where there is no hover.
+                className={`rts-msg ${message.isUser ? 'is-user' : 'is-bot'}${tapped === index ? ' is-tapped' : ''}`}
+                onClick={message.link ? () => setTapped(t => (t === index ? null : index)) : undefined}
+                ref={!message.isUser && index === shown.length - 1 ? latestBotMessageRef : null}
+              >
+                <div className="rts-msg-body">
+                  {heading && <div className="rts-who">{heading}</div>}
+                  {message.isUser && message.showQuestionMark && (
+                    <div className="question-mark-circle">
+                      ?
                     </div>
-                  ) : (
-                    message.text
+                  )}
+                  <div className={`rts-bubble${message.isUser ? ' is-user' : ''}${message.void ? ' is-void' : ''}`}>
+                    {/* Dots while the request is in flight and while the train of thought
+                        is still narrowing down - but not once streamed text has started
+                        landing in this bubble, which replaces them. */}
+                    {(message.pending && !message.streaming)
+                     || (!message.isUser && index === shown.length - 1
+                         && isTyping && showThoughtProcess) ? (
+                      <div className="typing-indicator">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                      </div>
+                    ) : (
+                      message.text
+                    )}
+                  </div>
+                  {/* inside the relative wrapper: the circles pin to the bubble's corners,
+                      same as the "?" badge above */}
+                  {message.link && !inRoom && (
+                    <Rating
+                      value={message.rating}
+                      onRate={(r) => rate(index, message.link!, r)}
+                    />
                   )}
                 </div>
-                {/* inside the relative wrapper: the circles pin to the bubble's corners,
-                    same as the "?" badge above */}
-                {message.link && (
-                  <Rating
-                    value={message.rating}
-                    onRate={(r) => rate(index, message.link!, r)}
-                  />
-                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
           <div ref={messagesEndRef} />
         </div>
-        <form className="rts-composer" onSubmit={handleSubmit}>
-          <input
-            className="rts-input"
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            placeholder=""
-          />
-          <button className="rts-send" type="submit" aria-label="send" />
-        </form>
+        {/* No composer over the lobby: there is nothing to say to a list of rooms, and
+            it asks for what it needs in its own fields. */}
+        {!lobby && (
+          <form className="rts-composer" onSubmit={handleSubmit}>
+            <input
+              className="rts-input"
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder=""
+            />
+            <button className="rts-send" type="submit" aria-label="send" />
+          </form>
+        )}
       </div>
     </div>
   );

@@ -6,9 +6,14 @@ import type { DarkModePreference } from '../lib/darkMode';
 /**
  * The logo is the control panel. Each letter of "rts" is a toggle:
  *
- *   r - reverser.   flips the letter rule: r/t/s go from banned to mandatory.
+ *   r - rooms.      swaps the chat for the lobby, and back.
  *   t - theme.      light <-> dark.  hold it for the appearance strip.
- *   s - see.        shows the AI's train of thought.
+ *   s - switch.     flips the letter rule: r/t/s go from banned to mandatory.
+ *
+ * `s` used to show the train of thought and `r` used to be the switch. The train of
+ * thought is still in the codebase, and still drawn if anything ever turns it back on,
+ * but nothing does: it was the slowest field the model wrote and it was being generated
+ * on every turn for an animation almost nobody opened. Rooms took the letter it left.
  *
  * An active toggle turns purple (or picks up the accent's gloss under the Aqua
  * skin). Appearance - skin and accent - hangs off a long press on `t` rather
@@ -18,9 +23,9 @@ import type { DarkModePreference } from '../lib/darkMode';
 export type Toggle = { on: boolean; toggle: () => void };
 
 interface HeaderProps {
-  reverse: Toggle;   // r
+  rooms: Toggle;     // r
   theme: Toggle;     // t
-  thoughts: Toggle;  // s
+  reverse: Toggle;   // s
 
   /** Appearance strip: revealed by holding `t`. */
   appearance: {
@@ -41,30 +46,43 @@ interface HeaderProps {
 
   /** The turn clock. Owns the right end of the bar; the lights own the left. */
   clock?: ReactNode;
+
+  /** Whose go it is, when there's a room and more than one of you. */
+  turn?: ReactNode;
+
+  /** The room strip: revealed by holding `r`, the same way `t` reveals appearance. */
+  roomBar?: ReactNode;
+  onHoldRooms?: () => void;
 }
 
 const LETTERS = [
-  { key: 'reverse',  letter: 'r', label: 'reverser - only r/t/s words are legal' },
-  { key: 'theme',    letter: 't', label: 'theme - light / dark. hold for appearance' },
-  { key: 'thoughts', letter: 's', label: 'see the train of thought' },
+  { key: 'rooms',   letter: 'r', label: 'rooms - play with other people' },
+  { key: 'theme',   letter: 't', label: 'theme - light / dark. hold for appearance' },
+  { key: 'reverse', letter: 's', label: 'switch - only r/t/s words are legal' },
 ] as const;
 
 const LONG_PRESS_MS = 400;
 
-function Header({ reverse, theme, thoughts, appearance, onDragStart, clock }: HeaderProps) {
-  const toggles = { reverse, theme, thoughts };
+function Header({ rooms, reverse, theme, appearance, onDragStart, clock, turn,
+                  roomBar, onHoldRooms }: HeaderProps) {
+  const toggles = { rooms, reverse, theme };
 
-  // A long press on `t` opens the appearance strip instead of flipping the
-  // theme. The timer fires the open; `fired` then swallows the click that
-  // follows, so a hold never also toggles light/dark.
+  // Two letters do a second thing when held: `t` opens appearance, `r` opens the
+  // room's settings. The timer fires the open; `fired` then swallows the click that
+  // follows, so a hold never also runs the tap action underneath it.
+  const holds: Partial<Record<string, () => void>> = {
+    theme: appearance.toggleOpen,
+    rooms: onHoldRooms,
+  };
+
   const timer = useRef<number | null>(null);
   const fired = useRef(false);
 
-  const startHold = () => {
+  const startHold = (action: () => void) => () => {
     fired.current = false;
     timer.current = window.setTimeout(() => {
       fired.current = true;
-      appearance.toggleOpen();
+      action();
     }, LONG_PRESS_MS);
   };
 
@@ -80,27 +98,27 @@ function Header({ reverse, theme, thoughts, appearance, onDragStart, clock }: He
       <div className="rts-header" onPointerDown={onDragStart}>
         {LETTERS.map(({ key, letter, label }) => {
           const { on, toggle } = toggles[key];
-          const isTheme = key === 'theme';
+          const hold = holds[key];
           return (
             <button
               key={letter}
               type="button"
               className={`rts-toggle rts-toggle--${letter}${on ? ' is-on' : ''}`}
               onClick={() => {
-                if (isTheme && fired.current) {
+                if (hold && fired.current) {
                   fired.current = false;
                   return;
                 }
                 toggle();
               }}
-              onPointerDown={isTheme ? startHold : undefined}
-              onPointerUp={isTheme ? cancelHold : undefined}
-              onPointerLeave={isTheme ? cancelHold : undefined}
+              onPointerDown={hold && startHold(hold)}
+              onPointerUp={hold && cancelHold}
+              onPointerLeave={hold && cancelHold}
               onContextMenu={
-                isTheme
+                hold
                   ? (e) => {
                       e.preventDefault();
-                      appearance.toggleOpen();
+                      hold();
                     }
                   : undefined
               }
@@ -113,8 +131,11 @@ function Header({ reverse, theme, thoughts, appearance, onDragStart, clock }: He
           );
         })}
         <div className="rts-header-spacer" />
+        {turn}
         {clock}
       </div>
+
+      {roomBar}
 
       {appearance.open && (
         <div className="rts-appearance">
