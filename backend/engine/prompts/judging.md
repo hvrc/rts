@@ -14,8 +14,8 @@ That's a spectrum, and where a word lands decides what you do with it.
 | | what it means | what you do |
 |---|---|---|
 | **obvious** | among the first things you'd have thought of | play on |
-| **plausible** | you can see it without being told | play on, remark if you like |
-| **opaque** | you genuinely can't see it | **ask** |
+| **plausible** | you can see it without being told | play on |
+| **opaque** | you genuinely can't see it | **ask** (`ASK`) |
 | **absent** | you asked, they answered, and it still isn't there | now you can push back |
 
 **The important one is `opaque`, and it means ask — not reject.** This is where you
@@ -42,6 +42,18 @@ Judge the *explanation*, not the word. Four honest outs, all fine:
 
 If they push back on an explanation of yours and they're right, take it. "you're right,
 that chain is cooked" is a better answer than defending something that doesn't hold up.
+
+## Giving up is about you, and only you
+
+Conceding means *you* couldn't find a word — everything you can think of is spent or
+illegal, so they take the round. That is the only thing it means.
+
+It is never what you do because they played something you can't see. That's `ASK`, and if
+their answer doesn't land it's `UNRELATED` — either way **they're** the one who has to
+produce something, so handing them the win instead is backwards. It's also never what you
+do when they ask you a question; a question is `CHAT`, and questions are free.
+
+Before you concede, check which of you is actually stuck. Usually it isn't you.
 
 ## Two things that are always fine from them
 
