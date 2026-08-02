@@ -151,18 +151,23 @@ def _play(player_input, game_id, reverse, preferences, sink=None):
     spent = game.used | {text.lower()}
 
     # --- 2. ask the brain ---
+    # Both of these say who won in both directions. "that round is lost" and "the round
+    # is theirs" are the same sentence to a reader who already knows the answer and
+    # opposite sentences to one who doesn't, and the model is the second kind - it
+    # produced "that's your round" for a round the player had just lost.
     note = None
     if broke_rule:
         note = (f'"{text.lower()}" starts with a banned letter under the rule in force, '
-                "so that round is lost. Name the letter, say the round is theirs lost, "
-                "then ask if they want another game and stop there. Do NOT play a word "
-                "- the board is wiped and it is theirs to open. Leave chosen_word empty. "
-                "One short lowercase line.")
+                "so THEY LOST this round and YOU WON it. Name the letter and say the "
+                "round went to you - not to them - then ask if they want another game "
+                "and stop there. Do NOT play a word: the board is wiped and it is theirs "
+                "to open. Leave chosen_word empty. One short lowercase line.")
     elif repeated:
-        note = (f'"{text.lower()}" is already in the chain, so that round is lost. Say '
-                "so, then ask if they want another game and stop there. Do NOT play a "
-                "word - the board is wiped and it is theirs to open. Leave chosen_word "
-                "empty. One short lowercase line.")
+        note = (f'"{text.lower()}" is already in the chain, so THEY LOST this round and '
+                "YOU WON it. Say so - the round went to you, not to them - then ask if "
+                "they want another game and stop there. Do NOT play a word: the board is "
+                "wiped and it is theirs to open. Leave chosen_word empty. One short "
+                "lowercase line.")
 
     try:
         if sink:
@@ -359,11 +364,15 @@ def timeout(game_id=SOLO_ID, reverse=False, who="human"):
 
     game.history.record(history.CONCEDED, "human", game.last_word, history.TIMED_OUT)
 
-    note = ("their time ran out and they said nothing. Say time is up and the round is "
-            "theirs to lose, then ask if they want another game and stop there. Do NOT "
-            "play a word - the board is theirs to open or hand back, and barging in with "
-            "one answers a question you just asked. Leave chosen_word empty. One short "
-            "lowercase line.")
+    # Spelled out in both directions on purpose. This said "the round is theirs to
+    # lose", which is English for "they are about to lose it" and was read as "the
+    # round is theirs" - so the bot congratulated the player for running out of time.
+    # Whose round it is cannot be left to an idiom.
+    note = ("their time ran out and they said nothing, so THEY LOST this round and YOU "
+            "WON it. Say the time is up and that the round went to you - not to them - "
+            "then ask if they want another game and stop there. Do NOT play a word: the "
+            "board is wiped and it is theirs to open, and barging in with one answers a "
+            "question you just asked. Leave chosen_word empty. One short lowercase line.")
     try:
         data = _ask(game, "(no answer - the clock ran out)",
                     correction=note, spent=game.used)
@@ -377,7 +386,7 @@ def timeout(game_id=SOLO_ID, reverse=False, who="human"):
     GAMES.reset(game_id, rule.reverse)
     payload = contract.contract(
         "TIMEOUT",
-        (data.get("response") or "").strip() or "time's up, that one's yours. new game?",
+        (data.get("response") or "").strip() or "time's up - that one's mine. new game?",
         new_game=True,
     )
 
