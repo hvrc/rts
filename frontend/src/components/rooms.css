@@ -128,12 +128,13 @@
 
 /* A word that didn't count - out of turn, or against the rules. It stays on screen,
    because it was said and pretending otherwise is worse, but it stops looking like
-   part of the chain. */
+   part of the chain.
+
+   Fading is the whole correction. A strikethrough scores the word out, which reads as
+   a telling-off for playing at the wrong moment; going quiet just says it didn't land,
+   and needs no sentence from the bot underneath it explaining that it didn't. */
 .rts-bubble.is-void {
-  opacity: 0.5;
-  text-decoration: line-through;
-  text-decoration-thickness: 1px;
-  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+  opacity: 0.45;
 }
 
 /* The room's own voice: joins, leaves, settings changing. Not a bubble at all - these
@@ -185,3 +186,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* --- phone -------------------------------------------------------------------
+
+   The lobby is a list you pick from with a thumb, so its rows want to be rows
+   rather than the compact bubbles a 280px desktop pane called for. */
+.rts-window.is-phone .rts-room { min-width: 180px; }
+.rts-window.is-phone .rts-field input { width: 180px; padding: 10px 15px; }
+.rts-window.is-phone .rts-msg .rts-bubble.rts-opt { padding: 8px 15px; }
+.rts-window.is-phone .rts-opts { gap: 8px; }

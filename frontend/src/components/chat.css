@@ -277,3 +277,35 @@
     transform: scale(1);
   }
 }
+/* --- phone -------------------------------------------------------------------
+
+   Slightly more of everything. The window is full-bleed on a phone, so there is
+   room to spend, and every one of these is something you hit with a thumb.
+
+   Bubble radius is deliberately left alone: under the aqua skin it is shared with
+   the ::before and ::after shine layers, and changing it in one place without the
+   other two pulls the highlight off the edge it is meant to sit on. */
+.rts-window.is-phone .rts-msg .rts-bubble { padding: 9px 14px; }
+.rts-window.is-phone .rts-msg { margin-bottom: 12px; }
+
+/* The lobby's input bubbles are shells: the field inside them does the padding, and
+   giving the shell some too would inset the text twice. Spelled out here rather than
+   left to source order because the rule above has to out-specify the aqua skin's own
+   bubble padding, which puts it above `.rts-field` as well. */
+.rts-window.is-phone .rts-msg .rts-bubble.rts-field { padding: 0; }
+
+.rts-window.is-phone .rts-composer {
+  gap: 10px;
+  padding: 12px 12px 10px;
+}
+
+.rts-window.is-phone .rts-input {
+  height: 42px;
+  padding: 10px 15px;
+  border-radius: 21px;
+}
+
+.rts-window.is-phone .rts-send {
+  width: 34px;
+  height: 34px;
+}

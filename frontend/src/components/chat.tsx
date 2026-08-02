@@ -253,7 +253,6 @@ function Chat() {
      has to be able to see whether there's a room *now* rather than when it was made. */
   const roomRef = useRef<RoomState | null>(null);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const latestBotMessageRef = useRef<HTMLDivElement>(null);
   const chatBoxRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -496,24 +495,65 @@ function Chat() {
     };
   }, []);
 
+  /**
+   * Scroll the conversation to the end.
+   *
+   * Deliberately `scrollTop = scrollHeight` rather than scrolling the end marker into
+   * view. The composer is an absolute overlay, so the scroll container's box runs on
+   * underneath it - which means the browser considers the last bubble "in view" while
+   * it is sitting behind the input, and `scrollIntoView` stops there satisfied. Asking
+   * for the maximum instead lands past the container's bottom padding, and that padding
+   * is exactly the height of the bar in the way.
+   */
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    const el = messagesContainerRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior });
+  }, []);
+
+  /* Whether the view is following the conversation.
+     Solo, every message answers something you just did, so you are always at the
+     bottom when one arrives and this is always true. In a room they arrive while you
+     are reading something further up - and dragging the view back mid-sentence every
+     time somebody else types is worse than missing the newest line. So the scroll only
+     follows when it was already following, and going back to the bottom re-arms it. */
+  const pinned = useRef(true);
+  const STICK_PX = 80;
+
+  const onScroll = useCallback(() => {
+    const el = messagesContainerRef.current;
+    if (el) pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < STICK_PX;
+  }, []);
+
+  useEffect(() => {
+    // The lobby is the one thing in this pane that reads downwards: "new room" is the
+    // first line and the rest is a list under it, so anchoring it to the bottom would
+    // open it showing the least interesting room.
+    if (lobby) {
+      messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+      return;
+    }
+    if (pinned.current) scrollToBottom();
+    // `botThinking` is in here because the placeholder bubble changes the height of
+    // the conversation without changing any message in it.
+  }, [messages, roomMsgs, botThinking, lobby, scrollToBottom]);
+
+  /* Walking into a room replaces the whole conversation, so there is nothing to
+     animate towards and no earlier position worth keeping. */
+  useEffect(() => {
+    pinned.current = true;
+    scrollToBottom('auto');
+  }, [room?.id, scrollToBottom]);
+
   /* Keep the newest message in view as the keyboard takes its space, the way every
      chat app does - otherwise the conversation stays where it was and the last thing
      said ends up behind the keyboard. */
   useEffect(() => {
     const viewport = window.visualViewport;
     if (!viewport) return;
-    const stick = () => messagesEndRef.current?.scrollIntoView({ block: 'end' });
+    const stick = () => scrollToBottom('auto');
     viewport.addEventListener('resize', stick);
     return () => viewport.removeEventListener('resize', stick);
-  }, []);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, roomMsgs]);
+  }, [scrollToBottom]);
 
   // Flipping the rule does not restart the game - the chain survives, and the new rule
   // governs every word from here on. The bot just says so.
@@ -1144,6 +1184,7 @@ function Chat() {
         <div
           ref={messagesContainerRef}
           className="messages-container"
+          onScroll={onScroll}
           style={{
             flex: 1,
             overflowY: 'scroll',
@@ -1252,7 +1293,6 @@ function Chat() {
               </div>
             );
           })}
-          <div ref={messagesEndRef} />
         </div>
         {/* No composer over the lobby: there is nothing to say to a list of rooms, and
             it asks for what it needs in its own fields. */}

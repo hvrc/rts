@@ -44,14 +44,36 @@ def create(name, bot=True, timer=True, reverse=False):
 
 def join(room, user_id, name):
     with room.lock:
+        first = not room.members
         member = room.join(user_id, name)
-        _post(room, _msg(room, None, member.name, f"{member.name} joined",
-                         kind="system"))
+
+        # "ana joined" to an empty room is a note addressed to nobody. The first person
+        # in gets the bot's opening line instead, which says the same thing and also
+        # says what to do about it.
+        if first and room.bot:
+            _bot_says(room, _opening(room))
+        else:
+            _post(room, _msg(room, None, member.name, f"{member.name} joined",
+                             kind="system"))
+
         _state(room)
         due = room.bot_turn
     if due:
         _wake(room)
     return member
+
+
+def _opening(room):
+    """Who starts, and what counts. Said once, when a room comes to life.
+
+    Deterministic rather than asked for: this is the first thing anybody sees, it is
+    the same every time, and making the room wait two seconds on a model to be told
+    whose go it is would be a strange way to open.
+    """
+    who = room.named(room.turn) if room.turn else "somebody"
+    rule = ("any word starting with r, t or s" if room.game.rule.reverse
+            else "any word that doesn't start with r, t or s")
+    return f"{who} starts - {rule}, and we go round from there"
 
 
 def leave(room, user_id):
@@ -111,6 +133,13 @@ def say(room, user_id, text):
             raise KeyError(user_id)
         room.touch()
 
+        # Somebody is here. Whatever they said, the room is awake again and the count
+        # of silent turns starts over - it is a run of consecutive misses that means an
+        # empty room, and one answer anywhere in it breaks the run.
+        woke, room.idle, room.skips = room.idle, False, 0
+        if woke:
+            room.arm()
+
         # No bot means nobody is refereeing, so nothing below applies: every message is
         # just a message. The clock stays, resetting on any of them - a shared
         # pace-maker with nothing riding on it.
@@ -160,12 +189,9 @@ def _illegal(room, user_id, word):
 def _resolve(room, user_id, name, word, flag):
     """Act on a word: seat it in the chain, or call it and pass the turn on."""
     if flag == "out_of_turn":
-        # One correction per turn, however many people blurt. Three people answering at
-        # once is a room enjoying itself; three identical corrections is the bot being
-        # a traffic warden about it.
-        if room.nudged_for != room.turn:
-            room.nudged_for = room.turn
-            _bot_says(room, f"not yet, {name} - {room.named(room.turn)}'s go")
+        # Nothing said about it. The word arrives greyed out, which is the whole
+        # message - and a room where three people answer at once is a room enjoying
+        # itself, not something that needs a line of correction each time it happens.
         return
 
     if flag:
@@ -207,6 +233,21 @@ def expire(room, whose):
         name = room.named(whose)
         room.game.history.record(history.CONCEDED, whose, room.game.last_word,
                                  history.TIMED_OUT)
+        if whose != BOT_ID:
+            room.skips += 1
+
+        # Everyone has now had a silent go, so there is nobody here. Stop, rather than
+        # walking the rotation announcing each absence in turn - a room left open in a
+        # background tab would otherwise do that until the room was swept, and what it
+        # produces is a screen of "X ran out of time" for anyone who does come back.
+        if room.deserted:
+            room.idle = True
+            room.disarm()
+            room.deadline = None
+            _bot_says(room, _resting(room))
+            _state(room)
+            return
+
         room.advance()
         _bot_says(room, f"{name} ran out of time" + _whos_up(room))
         _state(room)
@@ -215,13 +256,21 @@ def expire(room, whose):
         _wake(room)
 
 
+def _resting(room):
+    """What the room says when it stops waiting. Says how to start it again."""
+    word = room.game.last_word
+    return (f"nobody's about - i'll leave it there. say anything and we'll pick it back "
+            f"up from {word}" if word else
+            "nobody's about - i'll leave it there. say anything when you're back")
+
+
 # ---------------------------------------------------------------------------
 # the bot's own turn
 # ---------------------------------------------------------------------------
 def _wake(room):
     """Start the bot's turn, unless one is already out at the model."""
     with room.lock:
-        if room.thinking or not room.bot_turn:
+        if room.thinking or not room.bot_turn or room.idle:
             return
         room.thinking = True
     threading.Thread(target=_bot_turn, args=(room,), daemon=True).start()

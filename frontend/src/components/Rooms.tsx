@@ -91,7 +91,7 @@ function Rooms({ api, onEnter, reverse }: RoomsProps) {
     const fresh = mode.at === 'new';
     return (
       <form className="rts-lobby" onSubmit={enter}>
-        {ask(fresh ? 'new room. what do you want to call it?' : `joining ${mode.room.name}`)}
+        {ask(fresh ? 'room name?' : `joining ${mode.room.name}`)}
 
         {fresh && (
           <div className="rts-msg is-user">
@@ -109,7 +109,7 @@ function Rooms({ api, onEnter, reverse }: RoomsProps) {
           </div>
         )}
 
-        {ask(fresh ? 'and who are you?' : 'who are you?')}
+        {ask('your name?')}
 
         <div className="rts-msg is-user">
           <div className="rts-msg-body">
@@ -152,7 +152,7 @@ function Rooms({ api, onEnter, reverse }: RoomsProps) {
             </button>
             <button type="submit" className="rts-bubble is-user rts-opt is-go"
                     disabled={!who.trim() || busy}>
-              {busy ? '...' : fresh ? 'make it' : 'join'}
+              {busy ? '...' : fresh ? 'create' : 'join'}
             </button>
           </div>
         </div>
@@ -162,7 +162,7 @@ function Rooms({ api, onEnter, reverse }: RoomsProps) {
 
   return (
     <div className="rts-lobby">
-      {ask(rooms.length ? 'rooms' : 'no rooms yet. start one?')}
+      {ask(rooms.length ? 'rooms' : 'no rooms yet. create one?')}
 
       <div className="rts-msg is-bot">
         <div className="rts-msg-body">

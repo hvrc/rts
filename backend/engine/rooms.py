@@ -101,9 +101,11 @@ class Room:
         self._clock = None
         self.lock = threading.RLock()
 
-        # The last turn a "not yet, it's someone else's go" nudge was spent on. One
-        # per turn: three people blurting at once should not produce three corrections.
-        self.nudged_for = None
+        # Turns skipped in a row without a human saying anything, and whether the room
+        # has given up waiting. A round-robin room with nobody in it will otherwise
+        # walk the rotation forever, announcing each absence to an empty screen.
+        self.skips = 0
+        self.idle = False
 
     # --- membership ------------------------------------------------------------
     def unique_name(self, wanted):
@@ -180,6 +182,20 @@ class Room:
     def bot_turn(self):
         return self.bot and self.turn == BOT_ID
 
+    @property
+    def humans(self):
+        return [uid for uid in self.order if uid != BOT_ID and uid in self.members]
+
+    @property
+    def deserted(self):
+        """Has everyone in here now had a silent go?
+
+        The floor of two is for a room with one person in it: a single missed turn is
+        someone reading the board, and calling that an empty room after twenty seconds
+        would be wrong far more often than it was right.
+        """
+        return self.skips >= max(2, len(self.humans))
+
     # --- turn order ------------------------------------------------------------
     @property
     def playing(self):
@@ -204,7 +220,6 @@ class Room:
         else:
             nxt = self.order[0]
         self.turn = nxt
-        self.nudged_for = None
         self.arm()
         return nxt
 
@@ -232,10 +247,27 @@ class Room:
         self.touch()
 
     # --- the clock -------------------------------------------------------------
+    @property
+    def running(self):
+        """Is there anything for a clock to be counting?
+
+        Not while the board is empty. Whoever is up is opening, and an opening move is
+        not a response - there is no word to connect to, so there is nothing to be slow
+        about. It's the same rule solo play has, and without it a room starts counting
+        down the moment its first player walks in and finds themselves alone.
+
+        With the bot off there is no board to be empty, so the ambient clock instead
+        waits for somebody to say something - a room nobody has spoken in yet has
+        nothing to keep pace with either.
+        """
+        if not self.timer or self.idle:
+            return False
+        return self.game.last_word is not None if self.playing else bool(self.log)
+
     def arm(self):
         """(Re)start the countdown, if this room is running one at all."""
         self.disarm()
-        if not self.timer:
+        if not self.running:
             self.deadline = None
             return
         self.deadline = time.time() + TURN_S
