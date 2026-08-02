@@ -38,3 +38,23 @@ class Provider:
         Raise on failure - turn.py catches and degrades to the "?" bubble.
         """
         raise NotImplementedError
+
+    def stream_move(self, system_prompt, messages, ctx, schema=None):
+        """The same turn, yielded as it is generated.
+
+        Yields `(kind, payload)` pairs:
+
+            ("field", (name, value))  a top-level string field finished. The schema is
+                                      ordered so the code and the words all land before
+                                      `response` starts, which is what lets the engine
+                                      decide whether a turn is legal before any of the
+                                      reply has been shown.
+            ("delta", text)           more of `response`.
+            ("done", data)            the whole parsed move.
+
+        The default implementation is the non-streaming call wearing a costume: one
+        `done` and nothing else. That keeps every provider valid without forcing each
+        one to implement streaming, and the engine treats a provider that never emits a
+        delta as simply slower, not broken.
+        """
+        yield "done", self.move(system_prompt, messages, ctx)

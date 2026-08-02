@@ -47,8 +47,16 @@ EFFORT = (os.environ.get("RTS_EFFORT") or "medium").strip() or None
 # Haiku 4.5 rejects both this and EFFORT - set RTS_THINKING= and RTS_EFFORT= for it.
 THINKING = (os.environ.get("RTS_THINKING") or "adaptive").strip() or None
 
-# Anthropic only. Max web searches the bot may run in one turn; 0 turns it off. Server
-# side, so there is nothing to execute locally -- but each one costs seconds of a turn
-# somebody is waiting on, which is why the ceiling is low and the prompt says to reach
-# for it rarely.
-SEARCH = int(os.environ.get("RTS_SEARCH", "2"))
+# Anthropic only. Max web searches the bot may run in one turn; 0 turns it off.
+#
+# Off by default, because "offered on every turn" and "used rarely" are not the same
+# thing. Measured warm, over five turns each: with the tool attached the median turn was
+# 4.73s and it searched on one turn in five; with it detached, 2.71s. That is 43% of
+# every turn spent carrying an option that a fifth of turns took - and the searches
+# themselves are what produced the worst tail, since a search is seconds of network
+# while somebody watches a typing indicator.
+#
+# Set RTS_SEARCH=2 to put it back. It is worth having for the cases the prompt describes
+# (a justification that turns on something the model cannot know), just not worth
+# offering on a turn that is one word answering one word.
+SEARCH = int(os.environ.get("RTS_SEARCH", "0"))

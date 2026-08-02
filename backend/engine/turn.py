@@ -22,13 +22,52 @@ instead of answering, or quietly playing something else while a question is stil
 That last one is why `pending` exists.
 """
 
-from . import contract, history, prompts, rules
+import queue
+import threading
+import time
+
+from . import contract, history, prompts, rules, transcript
 from .preferences import Preferences
 from .providers import TurnContext, get_provider
+from .schema import move_schema as schema_for
 from .state import GAMES, SOLO_ID
 
 
-def play(player_input, game_id=SOLO_ID, reverse=False, preferences=None):
+def play_stream(player_input, game_id=SOLO_ID, reverse=False, preferences=None,
+                thoughts=True):
+    """One turn, yielded as it is written.
+
+    Yields ("delta", text) as the reply arrives and finally ("done", payload) with the
+    same contract dict `play` returns - so the client's handling of a finished turn is
+    unchanged and only the arrival time differs.
+
+    The turn runs on a worker thread feeding a queue rather than being restructured as
+    a generator. `_play` is a decision tree with three possible model calls and several
+    early returns; turning it inside out to yield from every branch would put streaming
+    plumbing into every rule in the game. A queue keeps the rules readable and confines
+    the concurrency to these fifteen lines.
+    """
+    events = queue.Queue()
+    sink = Sink(lambda text: events.put(("delta", text)), thoughts=thoughts)
+
+    def run():
+        try:
+            events.put(("done", play(player_input, game_id, reverse, preferences, sink)))
+        except Exception as e:                      # noqa: BLE001 - the client gets "?"
+            events.put(("done", contract.error(e)))
+        finally:
+            events.put(None)
+
+    threading.Thread(target=run, daemon=True).start()
+
+    while True:
+        item = events.get()
+        if item is None:
+            return
+        yield item
+
+
+def play(player_input, game_id=SOLO_ID, reverse=False, preferences=None, sink=None):
     """Handle one /echo turn. Returns the frozen contract dict.
 
     Both sides of the exchange are recorded afterwards, not before: the prompt already
@@ -36,11 +75,21 @@ def play(player_input, game_id=SOLO_ID, reverse=False, preferences=None):
     would send it twice. A loss or restart mid-turn swaps the Game object, hence the
     re-fetch - the transcript survives that swap, the board doesn't.
     """
-    payload = _play(player_input, game_id, reverse, preferences)
+    started = time.monotonic()
+    payload = _play(player_input, game_id, reverse, preferences, sink)
+    elapsed_ms = int((time.monotonic() - started) * 1000)
 
     game = GAMES.get(game_id)
     game.remember("user", (player_input or "").strip())
     game.remember("assistant", payload.get("response", ""))
+
+    # Written here rather than inside _play because this is the one point where a turn
+    # is definitely over and its shape is final - _play has several early returns and
+    # can call the model three times, and recording from in there would either miss
+    # branches or log turns that were then replaced by a retry.
+    transcript.record_turn(game_id, player_input, payload,
+                           reverse=game.rule.reverse, latency_ms=elapsed_ms,
+                           thoughts=sink.thoughts if sink else None)
 
     # Along for the ride, deliberately unmentioned. The bot never brings the score up and
     # nothing is obliged to render it - but it's tracked from the first turn, so whatever
@@ -49,7 +98,7 @@ def play(player_input, game_id=SOLO_ID, reverse=False, preferences=None):
     return payload
 
 
-def _play(player_input, game_id, reverse, preferences):
+def _play(player_input, game_id, reverse, preferences, sink=None):
     game = GAMES.get(game_id)
     taste = Preferences.from_payload(preferences)
 
@@ -101,7 +150,9 @@ def _play(player_input, game_id, reverse, preferences):
                 "another. Do not play a word of your own. Nobody has lost.")
 
     try:
-        data = _ask(game, text, taste=taste, spent=spent, correction=note)
+        if sink:
+            sink.gate = lambda fields: _will_stand(fields, rule, spent, game)
+        data = _ask(game, text, taste=taste, spent=spent, correction=note, sink=sink)
     except Exception as e:
         return contract.error(e)                    # frontend already renders "?" on ERROR
 
@@ -131,7 +182,7 @@ def _play(player_input, game_id, reverse, preferences):
     # model doesn't get to say it is.
     if code == "DUPLICATE" and not rules.looks_like_duplicate(text.lower(), game.used):
         try:
-            data = _ask(game, text, taste=taste, spent=spent,
+            data = _ask(game, text, taste=taste, spent=spent, sink=_ungated(sink),
                         correction="that word has NOT been played. A different word that "
                                    "happens to mean something similar is NOT a repeat - "
                                    "only the same word, or a plural/tense of it, is. "
@@ -194,7 +245,7 @@ def _play(player_input, game_id, reverse, preferences):
         if not _legal(chosen, rule, spent):
             try:
                 data = _ask(game, text, correction="you played an illegal or repeated word",
-                            taste=taste, spent=spent)
+                            taste=taste, spent=spent, sink=_ungated(sink))
             except Exception as e:
                 return contract.error(e)
             code = data.get("response_code", "CONCEDE")
@@ -306,15 +357,92 @@ def _settle_pending(game, data, text, code):
     game.pending = None
 
 
-def _ask(game, player_input, correction=None, taste=None, spent=None):
+def _ask(game, player_input, correction=None, taste=None, spent=None, sink=None):
     # `spent` = used words plus the human's pending word, so a provider can avoid
     # echoing it back rather than being caught by the post-check.
     ctx = TurnContext(game.rule, spent or game.used, game.chain, game.last_word)
-    return get_provider().move(
-        prompts.system_prompt(game.rule),
-        prompts.messages(game, player_input, correction, taste),
-        ctx,
-    )
+    provider = get_provider()
+    system = prompts.system_prompt(game.rule)
+    conversation = prompts.messages(game, player_input, correction, taste)
+
+    if sink is None:
+        return provider.move(system, conversation, ctx)
+
+    schema = schema_for(with_train_of_thought=sink.thoughts)
+    return sink.consume(provider.stream_move(system, conversation, ctx, schema))
+
+
+class Sink:
+    """Carries a streamed reply out to the client, once it is safe to show.
+
+    The engine may reject a turn and ask again - an illegal word, an invented
+    duplicate. Text already on screen cannot be taken back, so nothing is forwarded
+    until `gate` has approved this particular answer.
+
+    That check is possible mid-stream only because the schema puts `response_code`,
+    `their_word` and `chosen_word` ahead of `response`: by the time the first character
+    of the reply exists, the engine already knows the word it is about to play. A
+    rejected answer is swallowed whole and the retry streams in its place.
+    """
+
+    def __init__(self, emit, thoughts=True):
+        self.emit = emit
+        self.thoughts = thoughts
+        self.gate = None
+        self._open = None
+
+    def consume(self, events):
+        """Drain a provider stream and return the finished move."""
+        self._open = None
+        fields, data = {}, None
+
+        for kind, payload in events:
+            if kind == "field":
+                name, value = payload
+                fields[name] = value
+            elif kind == "delta":
+                if self._open is None:
+                    self._open = self.gate is None or bool(self.gate(fields))
+                if self._open:
+                    self.emit(payload)
+            elif kind == "done":
+                data = payload
+
+        return data if data is not None else fields
+
+
+def _ungated(sink):
+    """The same sink with its gate cleared.
+
+    A retry's answer is the one that gets used - there is no further round to replace
+    it - so it streams unconditionally. Without this it would inherit the gate that
+    rejected the answer it was sent to replace.
+    """
+    if sink:
+        sink.gate = None
+    return sink
+
+
+def _will_stand(fields, rule, spent, game):
+    """Will this answer be used as-is, or is the engine about to ask again?
+
+    Mirrors the two post-checks below that trigger a retry. It reads the three fields
+    the schema guarantees have already arrived, so the decision is available before the
+    reply itself starts - which is the whole reason a turn can stream at all.
+
+    Deliberately conservative: anything this can't confidently approve is withheld and
+    simply arrives a moment later when the turn finishes. A wrong "yes" puts text on
+    screen that the engine then contradicts; a wrong "no" costs nothing but the stream.
+    """
+    code = fields.get("response_code", "")
+
+    if code == "DUPLICATE":
+        return rules.looks_like_duplicate(_clean(fields.get("their_word")) or "", game.used)
+
+    if code == "OK":
+        return _legal(_clean(fields.get("chosen_word")), rule, spent)
+
+    return True
 
 
 def _clean(word):

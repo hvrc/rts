@@ -4,7 +4,34 @@ This is the contract between the engine and whatever brain is plugged in. A prov
 only job is to return a dict matching MOVE_SCHEMA - how it gets there (Anthropic
 structured outputs, an OpenAI-compatible json_schema, a local model coaxed with a
 json_object hint) is the provider's problem, not the engine's.
+
+**Field order is load-bearing.** Structured outputs are emitted in schema order, so the
+order here is the order the tokens arrive in, and that decides how a streamed turn feels:
+
+  1. response_code, their_word, chosen_word   tiny, and everything the engine needs to
+                                              decide whether this turn is legal
+  2. response                                 the only part a human reads
+  3. train_of_thought                         the largest field, and the one nobody sees
+                                              unless the `s` toggle is on
+
+Which means the deterministic post-checks can run before a single character of the reply
+is shown - the engine knows the word by then - and the reply can stream the moment it
+starts. `train_of_thought` used to sit above `response`, so every turn generated ~100
+tokens of animation data before writing anything the player would read.
 """
+
+
+def move_schema(with_train_of_thought=True):
+    """The schema for this turn.
+
+    The train of thought is only rendered when the `s` toggle is on, so when it's off it
+    is generated and thrown away - the single largest slice of output tokens on the turn.
+    Dropping it from the schema is a real latency saving, not a cosmetic one.
+    """
+    if with_train_of_thought:
+        return MOVE_SCHEMA
+    return _MOVE_SCHEMA_NO_TOT
+
 
 MOVE_SCHEMA = {
     "type": "object",
@@ -54,6 +81,15 @@ MOVE_SCHEMA = {
             ),
         },
         "chosen_word": {"type": "string"},
+        "response": {
+            "type": "string",
+            "description": (
+                "What they see. When you play a word this is normally just that word on "
+                "its own - no explanation of why it connects, no commentary. Only expand "
+                "when they actually asked you something, and keep it to one short "
+                "lowercase line even then."
+            ),
+        },
         "train_of_thought": {
             "type": "array",
             "items": {"type": "array", "items": {"type": "string"}},
@@ -67,17 +103,19 @@ MOVE_SCHEMA = {
                 "you didn't play a word."
             ),
         },
-        "response": {
-            "type": "string",
-            "description": (
-                "What they see. When you play a word this is normally just that word on "
-                "its own - no explanation of why it connects, no commentary. Only expand "
-                "when they actually asked you something, and keep it to one short "
-                "lowercase line even then."
-            ),
-        },
     },
-    "required": ["response_code", "their_word", "chosen_word", "train_of_thought",
-                 "response"],
+    "required": ["response_code", "their_word", "chosen_word", "response",
+                 "train_of_thought"],
     "additionalProperties": False,
+}
+
+
+# Same schema with the train of thought removed. Built by copy rather than written out
+# twice so the two can't drift - a duplicated description is a description that will be
+# edited in one place only.
+_MOVE_SCHEMA_NO_TOT = {
+    **MOVE_SCHEMA,
+    "properties": {k: v for k, v in MOVE_SCHEMA["properties"].items()
+                   if k != "train_of_thought"},
+    "required": [k for k in MOVE_SCHEMA["required"] if k != "train_of_thought"],
 }

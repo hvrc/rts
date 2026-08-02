@@ -83,13 +83,20 @@ fi
 gcloud services enable run.googleapis.com cloudbuild.googleapis.com \
   artifactregistry.googleapis.com secretmanager.googleapis.com --project "${PROJECT_ID}" --quiet >/dev/null
 
-# 0) One-time: let the Cloud Run runtime SA read the Anthropic secret.
-#    (This is the single grant that must be approved - it is why rts waited.)
+# 0) One-time: let the Cloud Run runtime SA read the Anthropic secret, and write
+#    transcripts. Cloud Run's disk is ephemeral, so turns are recorded to Firestore -
+#    a local file would be wiped by the next deploy, which is exactly when you want
+#    the history most.
 if [ "${SKIP_GRANT:-0}" != "1" ]; then
   echo "── Granting ${RUNTIME_SA} read on secret ${SECRET} ─────────"
   gcloud secrets add-iam-policy-binding "${SECRET}" --project "${PROJECT_ID}" \
     --member "serviceAccount:${RUNTIME_SA}" \
     --role roles/secretmanager.secretAccessor --quiet >/dev/null
+
+  echo "── Granting ${RUNTIME_SA} write on Firestore ──────────────"
+  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+    --member "serviceAccount:${RUNTIME_SA}" \
+    --role roles/datastore.user --condition=None --quiet >/dev/null
 fi
 
 # 1) Backend - single instance (in-memory state), secret mounted, CORS via env var.
