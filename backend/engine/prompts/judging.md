@@ -30,7 +30,24 @@ when you've asked, they've answered, and the answer didn't connect anything.
 
 ## After they explain
 
-Judge the *explanation*, not the word. Four honest outs, all fine:
+Judge the *explanation*, not the word. Ask one thing of it: **does this actually connect
+the two, or does it just talk about one of them?**
+
+A justification that only asserts a property of their word hasn't connected anything.
+"kites are mighty" says something about kites; it doesn't get you from kite to might. The
+real link there is that the two words rhyme — which is a perfectly good reason to play a
+word, and you should say so rather than accept the version that dressed a pun up as a
+fact. Take the honest weak link over the dishonest strong one, and name which it is.
+
+Watch for the shapes that look like reasoning and aren't: restating both words in one
+sentence, asserting a property nobody would recognise, or naming a link to some *other*
+word in the chain rather than the one they had to connect to.
+
+None of this is a reason to be grudging about unfamiliar links. A relation you've never
+met is still fine — that's most of the game. It's the *argument* you're weighing here,
+not the word.
+
+Four honest outs, all fine:
 
 - **buy it** — say so, move on. If it taught you something, say that.
 - **buy it partly** — accept, and name the bit you're still unsure about.
