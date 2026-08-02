@@ -21,7 +21,7 @@ without a restart. They're small; the cost is nothing.
 
 from pathlib import Path
 
-from . import history
+from . import history, reading
 
 _DIR = Path(__file__).parent / "prompts"
 
@@ -119,6 +119,13 @@ def _turn_block(game, player_input, correction=None, preferences=None):
         lines += ["", "<their_taste>", taste, "</their_taste>"]
 
     lines += ["", f'they just said: "{player_input}"']
+
+    # Observations, not instructions. The last thing that read the shape of a message
+    # decided from it, and forced any single word to be a move — right often enough to
+    # look fine, wrong exactly where it mattered. Noticing is safe; concluding wasn't.
+    noticed = reading.observe(player_input, game.pending)
+    if noticed:
+        lines += ["", f"(worth noticing: {noticed}. Your call either way.)"]
 
     if correction:
         lines += ["", f"NOTE: {correction}"]
