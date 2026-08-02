@@ -11,10 +11,15 @@ Steps 1 and 3 exist because the letter rule and duplicate detection must be 100%
 reliable and a model is not. Everything else is the model's job - including, now, the
 wording of a rule break, which the model phrases and the post-check enforces.
 
-Breaking the letter rule or replaying a word doesn't end anything. It's called, recorded
-in the history, and play carries on: ending a game over a slip is miserable, and typo
-repair means an honest mistype would otherwise kill a good chain. Only giving up ends a
-game, and only conceding wipes the board.
+Breaking the letter rule or replaying a word loses the round: the board is wiped and
+the bot asks whether you want another. It plays nothing into the new game - the board
+is yours to open, and barging in with a word would answer a question it just asked.
+
+That was the other way round for a while, on the grounds that an honest mistype
+shouldn't kill a good chain. What made it untenable was the clock: "try again" left the
+board exactly as it stood, so the timer kept counting against a word the player had
+already failed to answer, and every slip turned into a timeout a few seconds later. The
+board and the clock have to agree about whether the round is over.
 
 Rounds are lost by dropping an argument, never by having one. Asking "how?" and arguing
 back both cost nothing. What costs is walking away - saying so, asking for a fresh word
@@ -148,12 +153,16 @@ def _play(player_input, game_id, reverse, preferences, sink=None):
     # --- 2. ask the brain ---
     note = None
     if broke_rule:
-        note = (f'"{text.lower()}" starts with a banned letter under the rule in force. '
-                "Say so briefly and ask for another word. Do not play a word of your own "
-                "- the chain doesn't move. Nobody has lost; they just go again.")
+        note = (f'"{text.lower()}" starts with a banned letter under the rule in force, '
+                "so that round is lost. Name the letter, say the round is theirs lost, "
+                "then ask if they want another game and stop there. Do NOT play a word "
+                "- the board is wiped and it is theirs to open. Leave chosen_word empty. "
+                "One short lowercase line.")
     elif repeated:
-        note = (f'"{text.lower()}" is already in the chain. Say so briefly and ask for '
-                "another. Do not play a word of your own. Nobody has lost.")
+        note = (f'"{text.lower()}" is already in the chain, so that round is lost. Say '
+                "so, then ask if they want another game and stop there. Do NOT play a "
+                "word - the board is wiped and it is theirs to open. Leave chosen_word "
+                "empty. One short lowercase line.")
 
     try:
         if sink:
@@ -165,14 +174,25 @@ def _play(player_input, game_id, reverse, preferences, sink=None):
     code = data.get("response_code", "INVALID")
     reply = (data.get("response") or "").strip()
 
-    # An illegal word can't advance the chain no matter how the model answered. The model
-    # owns the wording; the board is not up for negotiation.
+    # An illegal word can't advance the chain no matter how the model answered, and it
+    # costs the round. The model owns the wording; the board is not up for negotiation.
+    #
+    # It used to cost nothing - called, recorded, play on - so that an honest mistype
+    # couldn't kill a good chain. The trouble was that "try again" left the board
+    # exactly as it was, so the clock kept running against a word the player had
+    # already failed to answer, and a slip quietly turned into a timeout instead. A
+    # round that ends when you break the rule is the version people expect, and the
+    # only version where the clock and the board agree about what just happened.
     if broke_rule or repeated:
         game.pending = None
-        return contract.contract(
-            "RTS" if broke_rule else "DUPLICATE",
-            reply or (f"{rule.violation_message}. go again" if broke_rule
-                      else f"{text.lower()}? already played. go again"),
+        word = text.lower()
+        game.history.record(history.CONCEDED, "human", word,
+                            history.BROKE_RULE if broke_rule else history.REPLAYED)
+        return _lose(
+            game_id, rule, "RTS" if broke_rule else "DUPLICATE",
+            reply or (f"{word} starts with {rules.first_letter(word)} - that round's "
+                      "mine. another game?" if broke_rule
+                      else f"{word}? already played - that round's mine. another game?"),
         )
 
     # The single-word override that used to live here is gone. It forced any one-word

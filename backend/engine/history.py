@@ -34,6 +34,8 @@ EXPLICIT = "explicit"              # "ok you got me"
 ABANDONED = "abandoned_challenge"  # walked away from an open question
 RESTARTED = "requested_restart"    # asked for a new word instead of finishing this one
 TIMED_OUT = "timed_out"            # the clock ran out with nothing said
+BROKE_RULE = "broke_rule"          # played a word starting with a banned letter
+REPLAYED = "replayed"              # played a word already in the chain
 
 
 class Event:
@@ -141,6 +143,8 @@ def score(history, player):
         "walked_away": sum(1 for e in lost if e.reason == ABANDONED),
         "restarted": sum(1 for e in lost if e.reason == RESTARTED),
         "timed_out": sum(1 for e in lost if e.reason == TIMED_OUT),
+        "broke_rule": sum(1 for e in lost if e.reason == BROKE_RULE),
+        "replayed": sum(1 for e in lost if e.reason == REPLAYED),
         "rule_breaks": _count(history, RULE_BREAK, player),
         "repeats": _count(history, REPEAT, player),
     }

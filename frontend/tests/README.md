@@ -7,6 +7,7 @@ refactor, so they are measured rather than eyeballed:
     node tests/routes.cjs    URLs, invitation links, and the lights spelling out
     node tests/panels.cjs    the appearance panel, and the bars not cutting bubbles
     node tests/chrome.cjs    --chrome-top tracks the header through every state
+    node tests/clock.cjs     the timer only runs when there is a word to answer
 
 /database has no test: it fetches one document and prints it, and there is nothing
 between those two steps worth pinning down.
