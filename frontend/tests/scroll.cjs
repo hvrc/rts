@@ -16,6 +16,25 @@ const API = 'http://localhost:5001';
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
+/* Take the room down on the way out. Every run of this used to leave a room behind,
+   and a lobby is a list of places worth going - a column of dead test rooms is the
+   one thing that stops it being that. */
+async function cleanUp(pages) {
+  for (const p of pages) {
+    await p.evaluate(() => {
+      const id = window.location.pathname.split('/').filter(Boolean)[0];
+      const me = localStorage.getItem('rts.user.v1');
+      if (!id || !me || id === 'rooms') return;
+      return fetch(`http://localhost:5001/rooms/${id}/leave`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: me }),
+      }).catch(() => {});
+    }).catch(() => {});
+  }
+}
+
+
 /** Bottom of the last bubble vs top of the composer, in viewport pixels. */
 async function overlap(page) {
   return page.evaluate(() => {
@@ -127,6 +146,7 @@ async function send(page, text) {
       await check(pa, label + ' +bot', failures);
     }
 
+    await cleanUp([pa, pb]);
     await a.close();
     await b.close();
   }

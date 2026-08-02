@@ -381,11 +381,17 @@ class RoomStore:
         return self._rooms.get(room_id)
 
     def list(self):
+        """Rooms worth walking into: the ones with somebody in them.
+
+        An empty room is not a place, it is a leftover - and it lingers for as long as
+        the sweep takes, so a lobby that showed them would mostly be showing where
+        people used to be. It stays reachable by its link until it's swept, which is
+        what matters: you can make a room, send the link and go and put the kettle on
+        without the room evaporating because you were the only one in it.
+        """
         with self._lock:
             self._sweep()
-            rooms = list(self._rooms.values())
-        # Busy rooms first, then whatever was alive most recently - the lobby's job is
-        # to point at somewhere worth walking into.
+            rooms = [r for r in self._rooms.values() if r.members]
         rooms.sort(key=lambda r: (-len(r.members), -r.last_active))
         return [r.public() for r in rooms]
 
