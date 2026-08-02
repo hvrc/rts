@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import './header.css';
 import { ACCENT_ORDER, accentSwatch, type AccentId } from '../lib/accent';
 import type { DarkModePreference } from '../lib/darkMode';
@@ -55,13 +55,24 @@ interface HeaderProps {
   onHoldRooms?: () => void;
 }
 
+/* Each light is the first letter of what it does, so the word can grow out of the
+   circle rather than appearing next to it - "r" is already the r of "room". */
 const LETTERS = [
-  { key: 'rooms',   letter: 'r', label: 'rooms - play with other people' },
-  { key: 'theme',   letter: 't', label: 'theme - light / dark. hold for appearance' },
-  { key: 'reverse', letter: 's', label: 'switch - only r/t/s words are legal' },
+  { key: 'rooms',   letter: 'r', rest: 'oom',   label: 'rooms - play with other people' },
+  { key: 'theme',   letter: 't', rest: 'heme',  label: 'theme - light dark. hold for more' },
+  { key: 'reverse', letter: 's', rest: 'witch', label: 'switch - only words starting with r t s' },
 ] as const;
 
 const LONG_PRESS_MS = 400;
+
+/** How long the lights stay spelled out after one is pressed. */
+const LABEL_MS = 3000;
+
+/* The skin is called `aqua` everywhere it is stored - the attribute on <html>, the
+   localStorage value, the ?skin= parameter, every selector in the stylesheet. Only
+   the word on the button changes, because renaming the identifier would invalidate
+   every stored preference for the sake of a label. */
+const SKIN_LABEL = { aqua: 'bubbly', flat: 'flat' } as const;
 
 function Header({ rooms, reverse, theme, appearance, onDragStart, clock, turn,
                   roomBar, onHoldRooms }: HeaderProps) {
@@ -78,6 +89,24 @@ function Header({ rooms, reverse, theme, appearance, onDragStart, clock, turn,
   const timer = useRef<number | null>(null);
   const fired = useRef(false);
 
+  /* Press any light and all three say what they are for three seconds.
+     After the press, never instead of it - the dots are the only labelling these
+     controls have, and a first-time tap that explained itself but did nothing would
+     be worse than one that does the thing. So the click lands, and the answer to
+     "what did I just press?" arrives immediately afterwards. */
+  const [labelled, setLabelled] = useState(false);
+  const labelTimer = useRef<number | null>(null);
+
+  const flash = () => {
+    setLabelled(true);
+    if (labelTimer.current !== null) clearTimeout(labelTimer.current);
+    labelTimer.current = window.setTimeout(() => setLabelled(false), LABEL_MS);
+  };
+
+  useEffect(() => () => {
+    if (labelTimer.current !== null) clearTimeout(labelTimer.current);
+  }, []);
+
   const startHold = (action: () => void) => () => {
     fired.current = false;
     timer.current = window.setTimeout(() => {
@@ -93,10 +122,42 @@ function Header({ rooms, reverse, theme, appearance, onDragStart, clock, turn,
     }
   };
 
+  /* A panel opened by holding a light is dismissed by touching anything else.
+     There is no close button and there shouldn't be: it was opened by a gesture, so
+     it should close by one, and on a phone the nearest thing to "put it away" is
+     tapping the conversation you wanted to get back to. */
+  const group = useRef<HTMLDivElement>(null);
+  const open = appearance.open || !!roomBar;
+
+  // Held in a ref so the listener below can be attached once per open rather than
+  // re-attached on every render: both callbacks arrive fresh each time.
+  const dismiss = useRef<() => void>(() => {});
+  dismiss.current = () => {
+    if (appearance.open) appearance.toggleOpen();
+    if (roomBar) onHoldRooms?.();
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: Event) => {
+      if (!group.current?.contains(e.target as Node)) dismiss.current();
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') dismiss.current();
+    };
+    document.addEventListener('pointerdown', away);
+    document.addEventListener('keydown', key);
+    return () => {
+      document.removeEventListener('pointerdown', away);
+      document.removeEventListener('keydown', key);
+    };
+  }, [open]);
+
   return (
-    <div className="rts-header-group">
-      <div className="rts-header" onPointerDown={onDragStart}>
-        {LETTERS.map(({ key, letter, label }) => {
+    <div className="rts-header-group" ref={group}>
+      <div className={`rts-header${labelled ? ' is-labelled' : ''}`}
+           onPointerDown={onDragStart}>
+        {LETTERS.map(({ key, letter, rest, label }) => {
           const { on, toggle } = toggles[key];
           const hold = holds[key];
           return (
@@ -110,6 +171,7 @@ function Header({ rooms, reverse, theme, appearance, onDragStart, clock, turn,
                   return;
                 }
                 toggle();
+                flash();
               }}
               onPointerDown={hold && startHold(hold)}
               onPointerUp={hold && cancelHold}
@@ -127,6 +189,10 @@ function Header({ rooms, reverse, theme, appearance, onDragStart, clock, turn,
               title={label}
             >
               <span>{letter}</span>
+              {/* The rest of the word, clipped to nothing until a press. Kept in the
+                  DOM rather than added on demand so the pill has a real width to
+                  animate towards - there is no transition from a circle to `auto`. */}
+              <span className="rts-toggle-rest" aria-hidden="true">{rest}</span>
             </button>
           );
         })}
@@ -148,7 +214,7 @@ function Header({ rooms, reverse, theme, appearance, onDragStart, clock, turn,
                 onClick={() => appearance.setSkin(s)}
                 aria-pressed={appearance.skin === s}
               >
-                {s}
+                {SKIN_LABEL[s]}
               </button>
             ))}
           </div>

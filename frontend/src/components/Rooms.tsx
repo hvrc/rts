@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import './rooms.css';
-import { savedName, type Member, type RoomMessage, type RoomState, type Rooms as RoomsApi } from '../lib/rooms';
+import { knownAs, savedName, type Member, type RoomMessage, type RoomState, type Rooms as RoomsApi } from '../lib/rooms';
 
 /**
  * The lobby, built out of the chat's own parts.
@@ -20,16 +20,26 @@ interface RoomsProps {
   /** Somebody got in. The parent takes over from here. */
   onEnter: (room: RoomState, messages: RoomMessage[], you: Member) => void;
   reverse: boolean;
+  /** Arrived by link: open this room's join form rather than the list. */
+  joining?: string | null;
+  /** The list is being shown, so the URL should say so. */
+  onBrowse?: () => void;
 }
 
-type Mode = { at: 'list' } | { at: 'new' } | { at: 'join'; room: RoomState };
+type Mode =
+  | { at: 'list' }
+  | { at: 'new' }
+  | { at: 'join'; room: RoomState }
+  /** Following a link: we have a name but not the room behind it yet. */
+  | { at: 'finding'; slug: string };
 
 /** How often the list refreshes while you're looking at it. */
 const POLL_MS = 4000;
 
-function Rooms({ api, onEnter, reverse }: RoomsProps) {
+function Rooms({ api, onEnter, reverse, joining, onBrowse }: RoomsProps) {
   const [rooms, setRooms] = useState<RoomState[]>([]);
-  const [mode, setMode] = useState<Mode>({ at: 'list' });
+  const [mode, setMode] = useState<Mode>(
+    joining ? { at: 'finding', slug: joining } : { at: 'list' });
   const [who, setWho] = useState(savedName);
   const [roomName, setRoomName] = useState('');
   const [bot, setBot] = useState(true);
@@ -57,8 +67,48 @@ function Rooms({ api, onEnter, reverse }: RoomsProps) {
   }, [api]);
 
   useEffect(() => {
-    if (mode.at !== 'list') field.current?.focus();
+    if (mode.at !== 'list' && mode.at !== 'finding') field.current?.focus();
   }, [mode]);
+
+  /* Turn a slug from the address bar into a room. Somebody arriving on a link has
+     never seen the lobby and shouldn't have to: the only thing between them and the
+     room is a name, so that is the only thing to ask for. */
+  useEffect(() => {
+    if (mode.at !== 'finding') return;
+    let live = true;
+    const slug = mode.slug;
+
+    api.get(slug)
+      .then(({ room }) => {
+        if (!live) return null;
+
+        // You have been in here before, so walk back in. Deliberately not "are you
+        // currently a member": closing the tab reports you as gone, and a reload is
+        // indistinguishable from that, so membership would make every refresh ask a
+        // room you have been talking in for ten minutes who you are.
+        const before = knownAs(slug);
+        if (before) {
+          return api.join(slug, before)
+            .then(got => { if (live) onEnter(got.room, got.messages, got.you); });
+        }
+        setMode({ at: 'join', room });
+        return null;
+      })
+      .catch(() => {
+        if (!live) return;
+        setError('that room has gone');
+        setMode({ at: 'list' });
+      });
+
+    return () => { live = false; };
+  }, [api, mode, onEnter]);
+
+  /* Whenever the list is what's showing, the URL should be /rooms - including after
+     backing out of a join form, so the address bar never claims you're somewhere you
+     have just left. */
+  useEffect(() => {
+    if (mode.at === 'list') onBrowse?.();
+  }, [mode.at, onBrowse]);
 
   const enter = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,6 +136,10 @@ function Rooms({ api, onEnter, reverse }: RoomsProps) {
       <div className="rts-msg-body"><div className="rts-bubble">{text}</div></div>
     </div>
   );
+
+  if (mode.at === 'finding') {
+    return <div className="rts-lobby">{ask(`looking for ${mode.slug}...`)}</div>;
+  }
 
   if (mode.at !== 'list') {
     const fresh = mode.at === 'new';
@@ -162,6 +216,10 @@ function Rooms({ api, onEnter, reverse }: RoomsProps) {
 
   return (
     <div className="rts-lobby">
+      {/* A link to a room that has since been dropped lands here. Saying so matters:
+          otherwise following an invitation and arriving at a list of other people's
+          rooms looks like the link was never anything in particular. */}
+      {error && ask(error)}
       {ask(rooms.length ? 'rooms' : 'no rooms yet. create one?')}
 
       <div className="rts-msg is-bot">

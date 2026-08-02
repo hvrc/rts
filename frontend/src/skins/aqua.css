@@ -95,22 +95,6 @@
     inset 0 0 0 1px rgba(255, 255, 255, 0.09);
 }
 
-/* There are no bars - only controls floating in front of the conversation.
-
-   The top and bottom strips have no fill of their own and no blur: the traffic lights,
-   the input pill and the send button each carry their own, and a bubble simply passes
-   behind them and is clipped by the window's rounded edge, which is the only thing in
-   the window that cuts anything.
-
-   Every intermediate version of this - an opaque bar, a veil, a blur - was a way of
-   hiding the bubble before it reached the edge. None of them were needed once the
-   strips stopped being part of the layout. */
-:root[data-skin='aqua'] .rts-header-group,
-:root[data-skin='aqua'] .rts-composer {
-  background: transparent;
-  box-shadow: none;
-}
-
 /* Full bleed on a phone: no rounded corners to clip against, and no drop shadow with
    nothing behind it to fall on. The glass fill and blur stay - that is what keeps the
    wallpaper visible through the app rather than behind a frame. */
@@ -500,4 +484,90 @@
 .rts-swatch:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
+}
+
+/* --- The appearance strip's own controls --------------------------------- */
+
+/* These buttons choose the skin, so they should be wearing it - a flat pill offering
+   you "bubbly" is asking you to take its word for something it could just show you.
+
+   Same construction as a bubble with one substitution: the shine is a background
+   gradient rather than the ::before / ::after pair. A pseudo-element would have to be
+   layered above the fill and below the label, and the label here is a bare text node
+   with nothing to raise it. The box-shadow stack is unchanged and needs no adjusting -
+   it follows whatever radius the element already has, so a pill gets exactly the edge
+   a bubble gets without either knowing the other's shape. */
+:root[data-skin='aqua'] .rts-skin {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--bubble-bot-bg);
+  color: var(--bubble-bot-text);
+  background-image: linear-gradient(
+    rgba(255, 255, 255, 0.75),
+    rgba(255, 255, 255, 0.12) 48%,
+    rgba(255, 255, 255, 0) 52%,
+    rgba(255, 255, 255, 0.3)
+  );
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.14),
+    0 1px 1px rgba(0, 0, 0, 0.25),
+    inset 0 1px 2px rgba(255, 255, 255, 0.6),
+    inset 0 0 4px rgba(0, 0, 0, 0.05),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.48),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  -webkit-font-smoothing: antialiased;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.07);
+}
+
+/* The chosen one is the player's own colour, the same way their bubble is - so "on"
+   is the same idea in the strip as it is in the conversation. */
+:root[data-skin='aqua'] .rts-skin.is-on {
+  background-color: var(--bubble-user-bg);
+  color: var(--bubble-user-text);
+}
+
+/* Dark repaints the whole stack rather than patching it, for the reason the bubble
+   does: a 0.6-alpha white top inset reads as a bright stripe on a dim fill. */
+:root[data-skin='aqua'][data-theme='dark'] .rts-skin {
+  background-image: linear-gradient(
+    rgba(255, 255, 255, 0.2),
+    rgba(255, 255, 255, 0.04) 48%,
+    rgba(255, 255, 255, 0) 52%,
+    rgba(255, 255, 255, 0.1)
+  );
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.35),
+    0 1px 1px rgba(0, 0, 0, 0.4),
+    inset 0 1px 2px rgba(255, 255, 255, 0.22),
+    inset 0 0 4px rgba(0, 0, 0, 0.18),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.18),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+  text-shadow: none;
+}
+
+:root[data-skin='aqua'][data-theme='dark'] .rts-skin.is-on {
+  background-color: var(--brand-dimmed);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+/* A pill is shorter than a bubble, so it needs its own breathing room rather than the
+   bubble's - but the gloss above needs somewhere to land. */
+:root[data-skin='aqua'] .rts-skin {
+  padding: 5px 12px;
+  border-radius: 999px;
+}
+
+/* Bigger targets on a phone, and the ring that marks the chosen one grows with them
+   so it stays a ring rather than closing up into a blob. */
+:root[data-skin='aqua'] .rts-window.is-phone .rts-swatch {
+  width: 20px;
+  height: 20px;
+}
+
+:root[data-skin='aqua'] .rts-window.is-phone .rts-swatch.is-on {
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.25),
+    inset 0 1px 1px rgba(255, 255, 255, 0.5),
+    0 0 0 2.5px var(--bg),
+    0 0 0 4.5px var(--accent);
 }

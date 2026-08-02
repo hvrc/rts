@@ -163,8 +163,16 @@
    scroll area ended where they began - and a bubble crossing that line was sliced flat
    across, mid-word. Lifting both out of the flow lets the messages run the full height
    of the window, so the only thing that ever cuts a bubble is the window's own rounded
-   edge. Under the aqua skin the bars also blur what passes beneath them, which is what
-   makes them read as glass sitting on top rather than as walls.
+   edge.
+
+   There are no bars, in either skin - only controls floating in front of the
+   conversation. The strips have no fill of their own: the traffic lights, the input
+   pill and the send button each carry their own, and a bubble simply passes behind
+   them and is clipped by the window's rounded edge.
+
+   Every intermediate version of this - an opaque bar, a veil, a blur - was a way of
+   hiding the bubble before it reached the edge. None were needed once the strips
+   stopped being part of the layout.
 
    Their heights are measured at runtime into --chrome-top / --chrome-bottom, because
    the top bar grows when the appearance strip opens and a hardcoded inset would put the
@@ -175,8 +183,7 @@
   left: 0;
   right: 0;
   z-index: 5;
-  background-color: var(--surface);
-  transition: background-color 0.25s ease;
+  background: transparent;
 }
 
 .rts-header-group { top: 0; }

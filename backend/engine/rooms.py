@@ -32,7 +32,12 @@ import unicodedata
 from .state import Game
 
 BOT_ID = "bot"
-BOT_NAME = "bot"
+BOT_NAME = "rts"
+
+#: Room ids are the first path segment on the site, so a room called "rooms" would
+#: shadow the lobby. Reserved rather than moved under a prefix: the link to a room is
+#: the point of rooms, and the shortest link is the best one.
+RESERVED = {"rooms", "settings", "api", "static", "assets", "index", "favicon"}
 
 #: Seconds a player has to take their turn. The client draws the same number.
 TURN_S = 20
@@ -364,7 +369,7 @@ class RoomStore:
             base = slug(name)
             room_id = base
             n = 2
-            while room_id in self._rooms:
+            while room_id in self._rooms or room_id in RESERVED:
                 room_id = f"{base}-{n}"
                 n += 1
             room = Room(room_id, (name or "").strip()[:32] or base,

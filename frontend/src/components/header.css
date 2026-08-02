@@ -36,15 +36,19 @@
 .rts-toggle { cursor: pointer; }
 
 .rts-toggle {
-  width: 17px;
+  /* `min-width` + a pill radius rather than a fixed width and a 50% radius: at 17px
+     wide a 999px radius *is* a circle, and it stays correct at every width in
+     between, so one element can be both shapes and animate between them. */
+  min-width: 17px;
   height: 17px;
   margin: 0;
   padding: 0;
   border: none;
   outline: none;
-  border-radius: 50%;
+  border-radius: 999px;
   cursor: pointer;
   flex: none;
+  overflow: hidden;
 
   display: flex;
   align-items: center;
@@ -61,7 +65,36 @@
      Drained less than the old saturated set needed: these fills start pastel, and the
      0.72 that merely softened a pure red takes a lavender most of the way to grey. */
   filter: saturate(0.82) brightness(1.01);
-  transition: filter 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
+  transition: filter 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease,
+              padding 0.34s cubic-bezier(0.22, 0.9, 0.24, 1);
+}
+
+/* --- the lights say what they do -------------------------------------------------
+
+   Press any one of them and all three spell themselves out for three seconds, then
+   go back to being dots.
+
+   Each light is already the first letter of its own word, so the pill grows out of the
+   circle instead of appearing beside it: "r" stays exactly where it was and "oom"
+   unrolls after it. Only the tail is animated, which is what makes each pill come out
+   the width of its own word - "switch" is wider than "room" without either being
+   measured or hardcoded. `max-width` is the animated property because there is no
+   transition from a circle to `width: auto`; it is a clamp above the natural width,
+   so it opens the tail fully and never stretches it. */
+.rts-toggle-rest {
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: max-width 0.34s cubic-bezier(0.22, 0.9, 0.24, 1);
+}
+
+.rts-header.is-labelled .rts-toggle { padding: 0 6px; }
+.rts-header.is-labelled .rts-toggle-rest { max-width: 60px; }
+
+/* Nothing to animate, so go straight to the useful state rather than skipping it. */
+@media (prefers-reduced-motion: reduce) {
+  .rts-toggle,
+  .rts-toggle-rest { transition: none; }
 }
 
 .rts-toggle.is-on { filter: saturate(1.25) brightness(1.04); }
@@ -144,10 +177,15 @@
 }
 
 .rts-window.is-phone .rts-toggle {
-  width: 22px;
+  min-width: 22px;
   height: 22px;
   font-size: 13px;
 }
+
+/* The pill needs a little more room either side at the larger size, and a little more
+   tail: "switch" at 13px is wider than "switch" at 11px. */
+.rts-window.is-phone .rts-header.is-labelled .rts-toggle { padding: 0 8px; }
+.rts-window.is-phone .rts-header.is-labelled .rts-toggle-rest { max-width: 72px; }
 
 /* The arc is drawn from a viewBox, so giving the element a bigger box scales the
    whole clock - stroke, radius and cap together - rather than stretching it. */
@@ -157,3 +195,34 @@
 }
 
 .rts-window.is-phone .rts-header .rts-timer { margin-right: 14px; }
+
+/* The appearance panel, sized for a thumb.
+
+   The swatches wrap rather than shrinking to fit: eleven 18px circles do not fit
+   across a narrow phone, and the alternative to a second row is dots too small to
+   land on - which is the one thing a colour picker cannot afford. `flex-wrap` and
+   a max-width are the whole mechanism; nothing counts the swatches. */
+.rts-window.is-phone .rts-appearance {
+  gap: 11px;
+  padding: 2px 14px 15px;
+}
+
+.rts-window.is-phone .rts-skins { gap: 6px; }
+
+.rts-window.is-phone .rts-skin {
+  padding: 6px 15px;
+  font-size: 13px;
+}
+
+.rts-window.is-phone .rts-accents {
+  flex-wrap: wrap;
+  gap: 10px;
+  max-width: 300px;
+  margin: 0 auto;
+  padding-bottom: 0;
+}
+
+.rts-window.is-phone .rts-swatch {
+  width: 20px;
+  height: 20px;
+}

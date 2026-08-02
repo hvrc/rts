@@ -78,6 +78,43 @@ export function rememberName(name: string) {
   localStorage.setItem(NAME_KEY, name);
 }
 
+/* Rooms this browser has been into, and as whom.
+ *
+ * Needed because closing the tab tells the server you've left - which is right, or a
+ * shut laptop holds a seat and stalls a lap every time round - but a reload looks
+ * exactly the same from the outside. Without this, refreshing a room you are sitting
+ * in asks who you are, which is a strange question to be asked by a room you have been
+ * talking in for ten minutes. So membership decides nothing here; having been let in
+ * once does. */
+const SEEN_KEY = 'rts.rooms.v1';
+const SEEN_LIMIT = 20;
+
+function seen(): Record<string, string> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SEEN_KEY) || '{}');
+    return raw && typeof raw === 'object' ? raw : {};
+  } catch {
+    return {};
+  }
+}
+
+/** The name you were using in this room, if you have been in it. */
+export function knownAs(roomId: string): string | null {
+  return seen()[roomId] || null;
+}
+
+function rememberRoom(roomId: string, name: string) {
+  const all = seen();
+  // Re-insert at the end so the oldest entry is the one that falls off.
+  delete all[roomId];
+  all[roomId] = name;
+  const keys = Object.keys(all);
+  for (const stale of keys.slice(0, Math.max(0, keys.length - SEEN_LIMIT))) {
+    delete all[stale];
+  }
+  localStorage.setItem(SEEN_KEY, JSON.stringify(all));
+}
+
 export class Rooms {
   constructor(private api: string) {}
 
@@ -98,17 +135,27 @@ export class Rooms {
     return this.send('/rooms');
   }
 
-  create(name: string, who: string,
-         opts: { bot: boolean; timer: boolean; reverse: boolean }): Promise<Entry> {
-    rememberName(who);
-    return this.send('/rooms', {
-      user_id: userId(), name: who, room_name: name, ...opts,
-    });
+  /** One room, whether or not you're in it. Throws "no such room" if it's gone. */
+  get(roomId: string): Promise<{ room: RoomState; messages: RoomMessage[] }> {
+    return this.send(`/rooms/${roomId}`);
   }
 
-  join(roomId: string, who: string): Promise<Entry> {
+  async create(name: string, who: string,
+               opts: { bot: boolean; timer: boolean; reverse: boolean }): Promise<Entry> {
     rememberName(who);
-    return this.send(`/rooms/${roomId}/join`, { user_id: userId(), name: who });
+    const entry: Entry = await this.send('/rooms', {
+      user_id: userId(), name: who, room_name: name, ...opts,
+    });
+    rememberRoom(entry.room.id, entry.you.name);
+    return entry;
+  }
+
+  async join(roomId: string, who: string): Promise<Entry> {
+    rememberName(who);
+    const entry: Entry = await this.send(`/rooms/${roomId}/join`,
+                                         { user_id: userId(), name: who });
+    rememberRoom(entry.room.id, entry.you.name);
+    return entry;
   }
 
   say(roomId: string, message: string) {

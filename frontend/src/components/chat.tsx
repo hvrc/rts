@@ -13,6 +13,7 @@ import {
   type RoomMessage,
   type RoomState,
 } from '../lib/rooms';
+import { current as currentRoute, go, type Route } from '../lib/route';
 import { gameId, loadPrefs, ratePair, type Link, type Rating as RatingValue } from '../lib/prefs';
 import { applyAccent, isAccentId, sampleWallpaperAccent, DEFAULT_ACCENT, type AccentId } from '../lib/accent';
 import {
@@ -207,7 +208,25 @@ function Chat() {
 
   // The three header toggles: r opens the lobby, t is the theme, s flips the letters.
   const [reverse, setReverse] = useState(false);                       // s
-  const [lobby, setLobby] = useState(false);                           // r
+
+  /* Where we are, and the address bar agrees. The route is the source of truth for
+     which of the three things this window is showing, rather than a flag per thing:
+     with `/`, `/rooms`, `/<room>` and `/<room>/settings` all reachable by link and by
+     the back button, a set of booleans alongside them would only be a second opinion
+     that could disagree. */
+  const [route, setRoute] = useState<Route>(currentRoute);
+
+  const navigate = useCallback((next: Route, replace = false) => {
+    go(next, replace);
+    setRoute(next);
+  }, []);
+
+  // The back button is a real way to move around this app now, so it has to be heard.
+  useEffect(() => {
+    const pop = () => setRoute(currentRoute());
+    window.addEventListener('popstate', pop);
+    return () => window.removeEventListener('popstate', pop);
+  }, []);
 
   /* Kept, and permanently off. The train of thought still renders - the animation
      below is untouched - but nothing turns it on any more: it was the largest field
@@ -221,10 +240,17 @@ function Chat() {
   const [room, setRoom] = useState<RoomState | null>(null);
   const [roomMsgs, setRoomMsgs] = useState<Message[]>([]);
   const [botThinking, setBotThinking] = useState(false);
-  const [roomBarOpen, setRoomBarOpen] = useState(false);
   const rooms = useMemo(() => new RoomsApi(API_URL), [API_URL]);
   const me = useMemo(() => userId(), []);
-  const inRoom = room !== null;
+
+  /* Everything about what's on screen, read off the route.
+     A URL naming a room you are not in yet is the invitation case: it shows the lobby,
+     already asking for the one thing that is missing. */
+  const wantedRoom = route.at === 'room' ? route.slug : null;
+  const inRoom = !!room && room.id === wantedRoom;
+  const lobby = route.at === 'lobby' || (wantedRoom !== null && !inRoom);
+  const joiningSlug = wantedRoom !== null && !inRoom ? wantedRoom : null;
+  const roomBarOpen = route.at === 'room' && route.settings && inRoom;
 
   // Dark mode is a tri-state preference (`t`), resolved to a boolean for the DOM.
   const [darkPref, setDarkPref] = useState<DarkModePreference>(initialDarkPreference);
@@ -459,7 +485,11 @@ function Chat() {
     observer.observe(header);
     observer.observe(composer);
     return () => observer.disconnect();
-  }, []);
+    // Re-run when the lobby comes and goes: it replaces the composer rather than
+    // hiding it, so the observer would otherwise be left measuring a node that is no
+    // longer in the document - and --chrome-bottom is what keeps the last message
+    // clear of the bar.
+  }, [lobby]);
 
   /**
    * Track the visual viewport, which is what the keyboard actually changes.
@@ -504,10 +534,16 @@ function Chat() {
    * it is sitting behind the input, and `scrollIntoView` stops there satisfied. Asking
    * for the maximum instead lands past the container's bottom padding, and that padding
    * is exactly the height of the bar in the way.
+   *
+   * Instant, not smooth, and that is load-bearing rather than a taste call. A smooth
+   * scroll fires `scroll` events all the way down, and every one of them is read below
+   * as "the view is nowhere near the bottom" - so the animation un-pins itself on its
+   * own way there, and the *next* message doesn't scroll at all. Setting scrollTop
+   * lands in one step, and the single event it fires is the one at the bottom.
    */
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+  const scrollToBottom = useCallback(() => {
     const el = messagesContainerRef.current;
-    if (el) el.scrollTo({ top: el.scrollHeight, behavior });
+    if (el) el.scrollTop = el.scrollHeight;
   }, []);
 
   /* Whether the view is following the conversation.
@@ -521,8 +557,12 @@ function Chat() {
 
   const onScroll = useCallback(() => {
     const el = messagesContainerRef.current;
-    if (el) pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < STICK_PX;
-  }, []);
+    // The lobby borrows this same scroll container, and it opens by jumping to the top
+    // of the room list. That is not you walking away from the conversation, so it must
+    // not be read as such - otherwise picking a room arrives with the view unpinned.
+    if (!el || lobby) return;
+    pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < STICK_PX;
+  }, [lobby]);
 
   useEffect(() => {
     // The lobby is the one thing in this pane that reads downwards: "new room" is the
@@ -541,7 +581,7 @@ function Chat() {
      animate towards and no earlier position worth keeping. */
   useEffect(() => {
     pinned.current = true;
-    scrollToBottom('auto');
+    scrollToBottom();
   }, [room?.id, scrollToBottom]);
 
   /* Keep the newest message in view as the keyboard takes its space, the way every
@@ -550,7 +590,7 @@ function Chat() {
   useEffect(() => {
     const viewport = window.visualViewport;
     if (!viewport) return;
-    const stick = () => scrollToBottom('auto');
+    const stick = () => scrollToBottom();
     viewport.addEventListener('resize', stick);
     return () => viewport.removeEventListener('resize', stick);
   }, [scrollToBottom]);
@@ -590,12 +630,11 @@ function Chat() {
       rooms.leave(room.id);
       setRoom(null);
       setRoomMsgs([]);
-      setRoomBarOpen(false);
-      setLobby(true);
+      navigate({ at: 'lobby' });
       return;
     }
-    setLobby(open => !open);
-  }, [room, rooms]);
+    navigate(lobby ? { at: 'solo' } : { at: 'lobby' });
+  }, [lobby, navigate, room, rooms]);
 
   /* Room settings live behind a hold on `r`, the same way appearance lives behind a
      hold on `t`. They belong to the room rather than to you, so changing one is
@@ -604,13 +643,23 @@ function Chat() {
     if (room) rooms.settings(room.id, patch).catch(() => {});
   }, [room, rooms]);
 
+  /* The lobby backed out of a join form, so the URL should stop naming a room we are
+     not in. Replaces rather than pushes: the join form and the list it came from are
+     one stop, not two, and pushing would make `back` bounce between them. */
+  const browse = useCallback(() => {
+    if (route.at !== 'lobby') navigate({ at: 'lobby' }, true);
+  }, [navigate, route.at]);
+
   /** Somebody got into a room. Everything from here arrives on its event stream. */
   const enterRoom = useCallback((state: RoomState, log: RoomMessage[], _you: Member) => {
     setRoom(state);
     setRoomMsgs(log.map(m => asMessage(m, me)));
     setReverse(state.reverse);
-    setLobby(false);
-  }, [me]);
+    // `replace` when the URL already names this room: arriving on a link and then
+    // pushing the same path would make the back button a no-op that looks broken.
+    navigate({ at: 'room', slug: state.id, settings: false },
+             route.at === 'room' && route.slug === state.id);
+  }, [me, navigate, route]);
 
   // Rating is on the link, not the word: "war" alone teaches the bot nothing, but
   // "from peace it leapt to war, and I liked that" is a taste it can act on. Saved to
@@ -1146,7 +1195,9 @@ function Chat() {
         ) : undefined}
         clock={<TurnTimer deadline={deadline} duration={TURN_MS}
                           onExpire={handleExpire} />}
-        onHoldRooms={inRoom ? () => setRoomBarOpen(o => !o) : undefined}
+        onHoldRooms={inRoom && room
+          ? () => navigate({ at: 'room', slug: room.id, settings: !roomBarOpen })
+          : undefined}
         roomBar={room && roomBarOpen ? (
           <div className="rts-appearance rts-roombar">
             <div className="rts-roombar-name">
@@ -1234,7 +1285,13 @@ function Chat() {
             </div>
           )}
           {lobby ? (
-            <Rooms api={rooms} onEnter={enterRoom} reverse={reverse} />
+            <Rooms
+              api={rooms}
+              onEnter={enterRoom}
+              reverse={reverse}
+              joining={joiningSlug}
+              onBrowse={browse}
+            />
           ) : shown.map((message, index) => {
             // The room talking about itself. A caption, not a bubble - nobody said it.
             if (message.note) {
