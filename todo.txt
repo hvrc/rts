@@ -1,4 +1,0 @@
-like, dislike
-voice chat
-spellcheck
-rts database
