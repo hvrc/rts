@@ -1,1 +1,17 @@
-web: gunicorn -b :$PORT server:app
+# One process, many threads. Every flag here is load-bearing.
+#
+# --workers 1 because rooms live in memory (engine/rooms.py) and the bus that fans
+# them out is a dict in this process. A second worker is a second copy of every room:
+# create lands on one, say lands on the other, and the other answers 404 for a room it
+# has never heard of. It is the same constraint as max-instances 1, one level down -
+# workers are that problem inside a single instance.
+#
+# --threads because the default sync worker serves one request at a time, and a room
+# holds a server-sent event stream open for as long as anybody is looking at it. With
+# one thread the first viewer takes the only worker and the backend stops answering
+# anyone - then thirty seconds later gunicorn's watchdog kills the worker for being
+# busy and takes every room in memory with it.
+#
+# --timeout 0 for that watchdog: a streaming request is *meant* to sit there for hours,
+# and the watchdog cannot tell that from a hang.
+web: gunicorn -b :$PORT --workers 1 --threads 32 --timeout 0 server:app

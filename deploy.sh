@@ -140,10 +140,25 @@ if [ "${SKIP_GRANT:-0}" != "1" ]; then
 fi
 
 # 1) Backend - single instance (in-memory state), secret mounted, CORS via env var.
+#
+# Two settings here exist for rooms, and both are invisible until a room is actually
+# used by a browser rather than by curl:
+#
+#   --timeout 3600     a room's event stream stays open for as long as somebody is in
+#                      the room. At the default 300s Cloud Run cuts it, and the client
+#                      silently reconnects every five minutes forever.
+#
+#   --no-cpu-throttling  the bot's turn runs on a worker thread after /say has already
+#                      answered. With CPU allocated only during request processing that
+#                      thread is frozen the moment the response goes out, and the bot
+#                      simply never moves. An open event stream happens to keep the CPU
+#                      on, which makes this fail only when nobody is watching - which is
+#                      the worst possible way for it to fail.
 echo "── Deploying ${BACKEND_SERVICE} ────────────────────────────"
 gcloud run deploy "${BACKEND_SERVICE}" \
   --source backend --region "${REGION}" --allow-unauthenticated \
-  --min-instances 0 --max-instances 1 --cpu 1 --memory 512Mi --port 8080 --timeout 120 \
+  --min-instances 0 --max-instances 1 --cpu 1 --memory 512Mi --port 8080 --timeout 3600 \
+  --no-cpu-throttling \
   --set-secrets "ANTHROPIC_API_KEY=${SECRET}:latest" \
   --set-env-vars "CORS_ORIGINS=https://${CUSTOM_DOMAIN},RTS_FIRESTORE_DB=${FIRESTORE_DB},RTS_TRANSCRIPT_TOKEN=${TRANSCRIPT_TOKEN}" \
   --quiet
