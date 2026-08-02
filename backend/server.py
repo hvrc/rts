@@ -34,9 +34,13 @@ import engine  # noqa: E402  (import after the key is in env so the client sees 
 
 app = Flask(__name__)
 
-# Prod origin + any localhost port (Vite may land on 5173/5174/...).
+# Allowed origins come from the CORS_ORIGINS env var (comma-separated): the prod
+# custom domain + the Cloud Run URL are injected at deploy time, so moving hosts or
+# domains needs no code change. The legacy App Engine origin stays as a fallback,
+# and any localhost port is always allowed for dev.
+_extra_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()]
 CORS(app, resources={r"/*": {
-    "origins": ["https://rts0-462101.ue.r.appspot.com",
+    "origins": _extra_origins + ["https://rts0-462101.ue.r.appspot.com",
                 r"http://localhost:\d+",
                 r"http://127\.0\.0\.1:\d+"],
     "methods": ["GET", "POST", "OPTIONS"],

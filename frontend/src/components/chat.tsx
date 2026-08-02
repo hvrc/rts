@@ -45,9 +45,12 @@ function initialTheme(): Theme {
 }
 
 function Chat() {
-  const API_URL = import.meta.env.PROD
-    ? 'https://backend-dot-rts0-462101.ue.r.appspot.com'
-    : 'http://localhost:5001';
+  // Backend URL is injected at build time via VITE_API_URL so the backend can move
+  // hosts/domains without a code change. Falls back to localhost for dev.
+  const API_URL = import.meta.env.VITE_API_URL
+    ?? (import.meta.env.PROD
+      ? 'https://backend-dot-rts0-462101.ue.r.appspot.com'
+      : 'http://localhost:5001');
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
