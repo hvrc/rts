@@ -1,4 +1,4 @@
-"""Anthropic brain — a single structured-output call per turn."""
+"""Anthropic brain - a single structured-output call per turn."""
 
 import json
 
@@ -52,7 +52,7 @@ class AnthropicProvider(Provider):
             "messages": messages,
         }
 
-        # Runs on Anthropic's side, so there's no execution loop to write — but it does
+        # Runs on Anthropic's side, so there's no execution loop to write - but it does
         # cost seconds, and someone is watching a typing indicator. The prompt is what
         # keeps it rare: it's for justifications that turn on something the model has no
         # way to know, not for looking up whether two ordinary words are related.
@@ -64,7 +64,7 @@ class AnthropicProvider(Provider):
             }]
         # Judging whether two words are related is the one genuinely hard call in a turn,
         # and it was being made with reasoning switched off. Leave thinking on unless a
-        # model is configured that can't do it — and note that disabling it on Sonnet 5
+        # model is configured that can't do it - and note that disabling it on Sonnet 5
         # or Opus 5 also risks a tool call arriving as plain text, which would silently
         # never run.
         if self.thinking:
@@ -90,7 +90,7 @@ def _parse_move(resp):
 
     Taking the first text block was fine when a response was only ever one block. With
     search in play the model narrates around the results, so the JSON is the *last* text
-    block rather than the first — and search result blocks sit in between. Work backwards
+    block rather than the first - and search result blocks sit in between. Work backwards
     and take the first thing that parses.
     """
     blocks = [b for b in resp.content if b.type == "text"]

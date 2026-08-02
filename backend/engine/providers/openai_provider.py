@@ -1,4 +1,4 @@
-"""OpenAI-compatible brain — covers local and open-source models.
+"""OpenAI-compatible brain - covers local and open-source models.
 
 Anything exposing POST {base_url}/chat/completions works: Ollama, LM Studio, vLLM,
 llama.cpp's server, Together, Groq, OpenRouter, OpenAI itself. Point RTS_BASE_URL at
@@ -82,7 +82,7 @@ class OpenAIProvider(Provider):
                 data = self._post(payload)
             except urllib.error.HTTPError as e:
                 last_error = e
-                continue  # server rejected this response_format — try a looser one
+                continue  # server rejected this response_format - try a looser one
             return _parse_move(data["choices"][0]["message"]["content"])
 
         raise RuntimeError(f"all chat/completions attempts failed: {last_error}")

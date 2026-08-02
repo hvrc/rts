@@ -1,4 +1,4 @@
-"""Provider registry — the one place that decides which brain answers.
+"""Provider registry - the one place that decides which brain answers.
 
 Add a model backend by writing a Provider subclass and adding a line to _REGISTRY.
 Callers only ever see get_provider().
@@ -20,7 +20,7 @@ _cached = None
 
 
 def get_provider():
-    """The provider named by RTS_PROVIDER. Built once — the choice can't change
+    """The provider named by RTS_PROVIDER. Built once - the choice can't change
     without a restart, and constructing one is not free."""
     global _cached
     if _cached is None:

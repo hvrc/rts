@@ -39,7 +39,7 @@ plate
 ceramic
 
 potery
-pottery's the word — potery ain't it
+pottery's the word - potery ain't it
 pottery
 clay
 
@@ -47,14 +47,14 @@ clay
 mushy
 mushy? from clay? nah
 red
-rts. you lose. new game — go
+rts. you lose. new game - go
 bro
 fist
 
 what's the relation
 bro -> fist. they go together
 hiw?
-fist bump, fist fight, closed hand — all from bro
+fist bump, fist fight, closed hand - all from bro
 how?
 fist -> bump, obviously
 no
@@ -120,9 +120,9 @@ fish
 bowl
 
 you already said bowl
-nah, you played bowl—i played fish
+nah, you played bowl-i played fish
 bro
-bro? already played. you lose. new game — go
+bro? already played. you lose. new game - go
 cooking
 fire
 
@@ -138,16 +138,16 @@ hungry
 belly
 
 skibidi
-rts. you lose. new game — go
+rts. you lose. new game - go
 skibidi
-rts. you lose. new game — go
+rts. you lose. new game - go
 oups
 oups? not a word
 ik
 know
 
 ok new game start
-we're already going — you're up after 'know'
+we're already going - you're up after 'know'
 question
 wise
 
@@ -164,9 +164,9 @@ athena
 owl
 
 why are you called rts and not rst
-rst would break the letter rule — that's the whole joke
+rst would break the letter rule - that's the whole joke
 explain like im a little kid (i am btw)
-owl hoots at night, catches mice—nocturnal hunter
+owl hoots at night, catches mice-nocturnal hunter
 the name thingy
 yeah, athena -> owl, the goddess link
 omd
@@ -194,7 +194,7 @@ lol ok but what's your word
 luke
 luke? from blade? nah
 knife
-knife? already played. you lose. new game — go
+knife? already played. you lose. new game - go
 annoying
 mood
 
@@ -204,12 +204,12 @@ jealousy
 jealous
 jealous? that's jealousy
 ok fine - brat
-ok, you got me. new game — go
+ok, you got me. new game - go
 annoying
 mood
 
 sad
-rts. you lose. new game — go
+rts. you lose. new game - go
 hello
 yo
 yogurt
@@ -223,7 +223,7 @@ nice try, but that's not how we play
 the customer is always right
 lol, not in word games
 can we play in french... i will kick your peach
-english only, but ok — your move
+english only, but ok - your move
 bagiette
 bagiette? nah
 ?
@@ -244,13 +244,13 @@ you're right, that chain is cooked lol
 haha lol
 your move
 i won
-lol, nah — your move
+lol, nah - your move
 after what
 lens -> after what? just playing lens, lol
 no lens doesnt count
 peace out
 bye
-lens is a word tho — glass, focus, camera
+lens is a word tho - glass, focus, camera
 bye
 peace out
 bye

@@ -1,4 +1,4 @@
-"""A brain with no network — for tests, offline dev, and CI.
+"""A brain with no network - for tests, offline dev, and CI.
 
 Plays the first word from a small pool that satisfies the active letter rule and
 hasn't been used yet. Dumb on purpose: it exists to prove the plumbing (including the

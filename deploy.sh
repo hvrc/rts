@@ -11,7 +11,7 @@
 #   SKIP_GRANT=1 ./deploy.sh   skip the one-time secret IAM grant (already done)
 #   VERIFY_ONLY=1 ./deploy.sh  just check what is live right now
 #
-# By default the frontend talks to the backend's run.app URL — nothing to provision, so a
+# By default the frontend talks to the backend's run.app URL - nothing to provision, so a
 # deploy is live the moment it finishes. To move the backend behind a subdomain instead:
 #
 #   BACKEND_DOMAIN=str.hvrc.place ./deploy.sh
@@ -28,7 +28,7 @@ FRONTEND_SERVICE="${FRONTEND_SERVICE:-rts-frontend}"
 SECRET="${SECRET:-rts-anthropic-key}"          # secret name in this project's Secret Manager
 CUSTOM_DOMAIN="${CUSTOM_DOMAIN-rts.hvrc.place}"     # frontend subdomain
 # Backend hostname the frontend calls. Empty (the default) means "use the service's own
-# run.app URL" — stable across redeploys, no DNS, no certificate to wait on. Set it to a
+# run.app URL" - stable across redeploys, no DNS, no certificate to wait on. Set it to a
 # subdomain to opt into a custom one; that also creates the domain mapping below.
 BACKEND_DOMAIN="${BACKEND_DOMAIN-}"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -45,13 +45,13 @@ verify() {
   if curl -sS --max-time 60 -X POST "${burl}/reset" -H 'Content-Type: application/json' \
         -d '{"reverse":false}' | grep -q "response"; then
     echo "  OK   backend /reset works (Anthropic key readable)"
-  else echo "  FAIL backend /reset failed — secret not readable? check the IAM grant"; fail=1; fi
+  else echo "  FAIL backend /reset failed - secret not readable? check the IAM grant"; fail=1; fi
   if [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "${furl}")" = "200" ]; then
     echo "  OK   frontend serves 200"; else echo "  FAIL frontend not serving"; fail=1; fi
 
   # Serving a 200 says nothing about WHICH backend the page will call. The backend URL is
   # compiled into the bundle at build time, so a frontend built against a dead host looks
-  # perfectly healthy from the outside — which is exactly how a typo'd build flag shipped
+  # perfectly healthy from the outside - which is exactly how a typo'd build flag shipped
   # twice unnoticed. Read the bundle back and assert the URL really made it in.
   local asset bundle
   asset="$(curl -s --max-time 20 "${furl}" | grep -o '/assets/[^"]*\.js' | head -1)"
@@ -84,7 +84,7 @@ gcloud services enable run.googleapis.com cloudbuild.googleapis.com \
   artifactregistry.googleapis.com secretmanager.googleapis.com --project "${PROJECT_ID}" --quiet >/dev/null
 
 # 0) One-time: let the Cloud Run runtime SA read the Anthropic secret.
-#    (This is the single grant that must be approved — it is why rts waited.)
+#    (This is the single grant that must be approved - it is why rts waited.)
 if [ "${SKIP_GRANT:-0}" != "1" ]; then
   echo "── Granting ${RUNTIME_SA} read on secret ${SECRET} ─────────"
   gcloud secrets add-iam-policy-binding "${SECRET}" --project "${PROJECT_ID}" \
@@ -92,7 +92,7 @@ if [ "${SKIP_GRANT:-0}" != "1" ]; then
     --role roles/secretmanager.secretAccessor --quiet >/dev/null
 fi
 
-# 1) Backend — single instance (in-memory state), secret mounted, CORS via env var.
+# 1) Backend - single instance (in-memory state), secret mounted, CORS via env var.
 echo "── Deploying ${BACKEND_SERVICE} ────────────────────────────"
 gcloud run deploy "${BACKEND_SERVICE}" \
   --source backend --region "${REGION}" --allow-unauthenticated \
@@ -103,7 +103,7 @@ gcloud run deploy "${BACKEND_SERVICE}" \
 BURL="$(gcloud run services describe "${BACKEND_SERVICE}" --region "${REGION}" --format='value(status.url)')"
 echo "Backend URL: ${BURL}"
 
-# 2) Frontend — static SPA; backend URL baked in at build time. Defaults to the backend's
+# 2) Frontend - static SPA; backend URL baked in at build time. Defaults to the backend's
 #    run.app URL, which already carries its scheme; a custom BACKEND_DOMAIN does not.
 FRONTEND_API="${BACKEND_DOMAIN:+https://${BACKEND_DOMAIN}}"
 FRONTEND_API="${FRONTEND_API:-$BURL}"

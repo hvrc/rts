@@ -1,4 +1,4 @@
-# RTS — Deployment Guide
+# RTS - Deployment Guide
 
 How the RTS app is deployed to Google Cloud, and how to do it again repeatably.
 
@@ -12,8 +12,8 @@ The app runs as two App Engine **services** in one project:
 
 | Service   | Runtime      | Source        | Serves                                                        |
 |-----------|--------------|---------------|--------------------------------------------------------------|
-| `default` | nodejs22     | `frontend/`   | the built Vite SPA (`dist/`) — the main site                 |
-| `backend` | python312    | `backend/`    | the Flask API (`/echo`, `/reset`) — the Claude game brain    |
+| `default` | nodejs22     | `frontend/`   | the built Vite SPA (`dist/`) - the main site                 |
+| `backend` | python312    | `backend/`    | the Flask API (`/echo`, `/reset`) - the Claude game brain    |
 
 > A third service, `frontend` (nodejs22), is an old/unused deploy target. Ignore it.
 
@@ -23,7 +23,7 @@ The app runs as two App Engine **services** in one project:
 
 The frontend calls the backend at the hardcoded prod URL in
 `frontend/src/components/chat.tsx` (`import.meta.env.PROD` branch). The backend
-holds the `ANTHROPIC_API_KEY` — never shipped in code; it is pulled from
+holds the `ANTHROPIC_API_KEY` - never shipped in code; it is pulled from
 **Secret Manager** at startup (see below).
 
 ## Prerequisites (one-time per machine)
@@ -75,7 +75,7 @@ restart instances). `versions/latest` is resolved at startup.
 printf '%s' "sk-ant-NEW-KEY" | gcloud secrets versions add anthropic-api-key --data-file=-
 ```
 
-How the code consumes it — in `backend/server.py`, right after `load_dotenv()`:
+How the code consumes it - in `backend/server.py`, right after `load_dotenv()`:
 
 ```python
 if not os.environ.get("ANTHROPIC_API_KEY") and os.environ.get("GOOGLE_CLOUD_PROJECT"):
@@ -105,7 +105,7 @@ instance_class: F1
 
 automatic_scaling:
   # MUST stay 1 while game state is in-memory (engine/state.py). With 2 instances each
-  # keeps its own GAMES dict and requests round-robin between them — the chain splits
+  # keeps its own GAMES dict and requests round-robin between them - the chain splits
   # and duplicate words slip through, because the instance answering this turn never
   # saw the word played on the last one. Raising this requires shared storage first.
   max_instances: 1
@@ -161,7 +161,7 @@ handlers:
 
 ## Deploy the backend
 
-Standard, safe procedure — deploy without traffic, smoke-test, then flip traffic.
+Standard, safe procedure - deploy without traffic, smoke-test, then flip traffic.
 
 ```bash
 cd backend
@@ -205,7 +205,7 @@ gcloud app deploy app.yaml       # deploys to the 'default' service
 
 ## Rollback
 
-Traffic migration is instant and reversible — just point traffic at a previous version:
+Traffic migration is instant and reversible - just point traffic at a previous version:
 
 ```bash
 # List versions to find a known-good one
@@ -227,12 +227,12 @@ gcloud app versions delete VERSION_ID --service=backend
 ## Run locally (for reference)
 
 ```bash
-# Backend — port 5001 (macOS AirPlay usually squats on 5000)
+# Backend - port 5001 (macOS AirPlay usually squats on 5000)
 cd backend
 python3 -m venv venv && ./venv/bin/pip install -r requirements.txt
 # put your key in backend/.env:  ANTHROPIC_API_KEY=sk-ant-...
 PORT=5001 ./venv/bin/python server.py
 
-# Frontend — Vite dev server on :5173, talks to localhost:5001
+# Frontend - Vite dev server on :5173, talks to localhost:5001
 cd frontend && npm install && npm run dev
 ```

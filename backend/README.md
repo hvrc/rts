@@ -10,7 +10,7 @@ be 100% reliable (the letter rule, duplicates); a model owns everything judgment
 server.py              Flask. Two routes, no logic.
 engine/
   __init__.py          the public surface: play(), reset()
-  config.py            every knob, read from env — which provider, which model
+  config.py            every knob, read from env - which provider, which model
   rules.py             the deterministic rules, incl. the reversible letter rule
   state.py             game state, keyed by id (multiplayer is a routing change)
   prompts.py           loads prompts/*.md
@@ -55,7 +55,7 @@ RTS_PROVIDER=anthropic
 RTS_MODEL=claude-haiku-4-5
 ANTHROPIC_API_KEY=sk-ant-...
 
-# Any OpenAI-compatible server — local or hosted
+# Any OpenAI-compatible server - local or hosted
 RTS_PROVIDER=openai
 RTS_BASE_URL=http://localhost:11434/v1   # Ollama, LM Studio, vLLM, llama.cpp, Groq...
 RTS_MODEL=llama3.1
@@ -71,12 +71,12 @@ in `providers/__init__.py`.
 
 `LetterRule` governs both directions from one object, so the two modes cannot drift:
 
-- **normal** — a word may NOT start with r/t/s.
-- **reversed** — a word may ONLY start with r/t/s.
+- **normal** - a word may NOT start with r/t/s.
+- **reversed** - a word may ONLY start with r/t/s.
 
 The client owns the toggle (the "r" circle in the header) and sends `reverse` on every
 request, so the frontend and backend can't disagree about which rule is in force.
-Flipping mid-game keeps the chain — the new rule governs words from there on.
+Flipping mid-game keeps the chain - the new rule governs words from there on.
 
 ## API
 
@@ -100,7 +100,7 @@ cp .env.example .env            # then put your ANTHROPIC_API_KEY in .env
 PORT=5001 ./venv/bin/python server.py
 ```
 
-macOS AirPlay squats on port 5000, hence 5001 — which is what the frontend's dev
+macOS AirPlay squats on port 5000, hence 5001 - which is what the frontend's dev
 `API_URL` already points at.
 
 Offline, with no key at all:

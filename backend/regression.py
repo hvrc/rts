@@ -4,14 +4,14 @@
     cd backend && venv/bin/python regression.py
     venv/bin/python regression.py what no      # only cases matching those words
 
-Every case here is a bug that actually shipped. Prompt work is not additive — fixing the
+Every case here is a bug that actually shipped. Prompt work is not additive - fixing the
 bot's rigidity made it concede when challenged, giving it a code for asking made it
 chatty, telling it to vary its phrasing made it vary one word and keep the sentence. None
 of that was visible from the change itself, only from replaying what used to work.
 
 This makes real API calls, so it costs money and takes a couple of minutes. That's the
 price of testing behaviour that lives in a prompt: there is nothing to unit test, because
-nothing here is deterministic. Judge it as a smoke test, not a spec — a case failing means
+nothing here is deterministic. Judge it as a smoke test, not a spec - a case failing means
 go and look, not that the build is broken.
 """
 

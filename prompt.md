@@ -20,7 +20,7 @@ fist
 what's the relation
 bro -> fist. they go together
 hiw?
-fist bump, fist fight, closed hand — all from bro
+fist bump, fist fight, closed hand - all from bro
 how?
 fist -> bump, obviously
 no
@@ -48,16 +48,16 @@ also get rid of the new game separator no need to show ui denoting new game, not
 also it would be nice for the bot to have some context of the game. the game is called rts because rts are the most common letters in the alphabet. 
 
 why are you called rts and not rst
-rst would break the letter rule — that's the whole joke
+rst would break the letter rule - that's the whole joke
 
 the question by the user here is tricky, the bot should be able to give a correct contextual answer but also figure out how to actually understand and answer the user's query, here the bot needs to be intelligent to say idk why its not called rst since thats the atcual sequence of those letters
 
 BOT SHOULD BE ABLE TO SWITCH LANGUAGES AND PLAY IN DIFFERNET LANGUAGES IF PROMPTED
 
 why are you called rts and not rst
-rst would break the letter rule — that's the whole joke
+rst would break the letter rule - that's the whole joke
 explain like im a little kid (i am btw)
-owl hoots at night, catches mice—nocturnal hunter
+owl hoots at night, catches mice-nocturnal hunter
 the name thingy
 yeah, athena -> owl, the goddess link
 omd
@@ -77,7 +77,7 @@ you're right, that chain is cooked lol
 haha lol
 your move
 i won
-lol, nah — your move
+lol, nah - your move
 after what
 lens -> after what? just playing lens, lol
 no lens doesnt count

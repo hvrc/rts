@@ -2,7 +2,7 @@
 
 A provider is a brain. It gets a rendered system prompt, the conversation so far as a
 list of {"role", "content"} messages, and a read-only view of the game (`ctx`), and
-returns a dict matching schema.MOVE_SCHEMA. That's the entire contract — the engine never
+returns a dict matching schema.MOVE_SCHEMA. That's the entire contract - the engine never
 knows or cares which model answered.
 
 `messages` is real history, not a summary of it, and the last entry carries the current
@@ -35,6 +35,6 @@ class Provider:
     def move(self, system_prompt, messages, ctx):
         """Return a dict matching schema.MOVE_SCHEMA.
 
-        Raise on failure — turn.py catches and degrades to the "?" bubble.
+        Raise on failure - turn.py catches and degrades to the "?" bubble.
         """
         raise NotImplementedError

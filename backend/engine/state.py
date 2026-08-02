@@ -1,6 +1,6 @@
 """Game state.
 
-Today the server only ever asks for one game (SOLO_ID) — the app is a single-player
+Today the server only ever asks for one game (SOLO_ID) - the app is a single-player
 toy. But state is keyed by game id and held in a store, so adding multiplayer means
 passing a real id from the route and giving Game a player list. Nothing else in the
 engine has to change.
@@ -24,8 +24,8 @@ TRANSCRIPT_WINDOW = 40
 class Game:
     """One game's worth of state.
 
-    The split that matters is board vs history. The board — chain, spent words, whose
-    turn — is the game, and it's wiped whenever one ends. The history is the session: what
+    The split that matters is board vs history. The board - chain, spent words, whose
+    turn - is the game, and it's wiped whenever one ends. The history is the session: what
     was said, what happened, what was argued over. That doesn't restart just because a
     game did. The human can still see the last twenty messages on screen, so the bot has
     to remember them too, and a score kept across three games is only a score if it
@@ -37,7 +37,7 @@ class Game:
         self.used = set()                   # lowercased words already spent
         self.last_word = None               # the word the next move must relate to
         self.rule = LetterRule(reverse)     # normal or reversed letter rule
-        self.history = history or History() # transcript, events, links — outlives resets
+        self.history = history or History() # transcript, events, links - outlives resets
         self.pending = None                 # a question nobody has answered yet
 
     @property
@@ -61,7 +61,7 @@ class Game:
     def set_reverse(self, reverse):
         """Flip the letter rule mid-game.
 
-        The chain survives — already-played words stay played, and the new rule only
+        The chain survives - already-played words stay played, and the new rule only
         governs words from here on. That's the intended behavior: flipping the rule is
         a twist, not a restart.
         """
@@ -83,7 +83,7 @@ class GameStore:
         A loss or a restart clears the chain, but the two of them are still talking and
         the messages are still on screen. Carrying the history over is what stops the bot
         answering "why did you say owl?" with "what owl?" one turn after a new game began
-        — and it's what makes a score across several games mean anything.
+        - and it's what makes a score across several games mean anything.
         """
         previous = self._games.get(game_id)
         self._games[game_id] = Game(

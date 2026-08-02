@@ -1,4 +1,4 @@
-"""RTS backend — thin Flask layer over the engine package.
+"""RTS backend - thin Flask layer over the engine package.
 
   POST /echo  {"message": str, "reverse": bool}  -> {response, train_of_thought, response_code}
   POST /reset {"reverse": bool}                  -> {response, train_of_thought}
@@ -17,7 +17,7 @@ from flask_cors import CORS
 
 load_dotenv()  # pull ANTHROPIC_API_KEY (and anything else) from backend/.env
 
-# In production (App Engine) there is no .env — pull the key from Secret Manager.
+# In production (App Engine) there is no .env - pull the key from Secret Manager.
 # GOOGLE_CLOUD_PROJECT is set automatically on App Engine and absent locally, so
 # local dev skips this entirely and keeps using .env.
 if not os.environ.get("ANTHROPIC_API_KEY") and os.environ.get("GOOGLE_CLOUD_PROJECT"):

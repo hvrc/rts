@@ -1,6 +1,6 @@
 """What can be known about a message without asking a model.
 
-Everything here is free, instant and certain — the shape of the text, not what it means.
+Everything here is free, instant and certain - the shape of the text, not what it means.
 It feeds the prompt as observations rather than conclusions, and that distinction is the
 whole point of the module.
 
@@ -15,7 +15,7 @@ So: no rules here, no vetoes. Just things worth noticing.
 
 import re
 
-# Words that are almost never a move. Not a blocklist — the model still decides, and
+# Words that are almost never a move. Not a blocklist - the model still decides, and
 # "no" genuinely is a word someone could play. But when one of these arrives with a
 # question already open, it is answering the question roughly always, and saying so out
 # loud costs nothing.
@@ -37,7 +37,7 @@ _QUESTIONISH = re.compile(
 def observe(text, pending=None):
     """Notes on a message, or "" when there's nothing worth saying.
 
-    Deliberately quiet. A plain word on a plain turn produces nothing at all — the model
+    Deliberately quiet. A plain word on a plain turn produces nothing at all - the model
     doesn't need to be told that a word looks like a word, and a prompt that comments on
     every turn trains it to stop reading the comments.
     """
@@ -53,7 +53,7 @@ def observe(text, pending=None):
         notes.append(
             f'"{text}" is one of those words people say rather than play. It can be a '
             "move, but usually it is them talking to you"
-            + (" — and with a question of yours open, it is almost certainly their answer"
+            + (" - and with a question of yours open, it is almost certainly their answer"
                if pending else "")
         )
     elif not bare and pending and _QUESTIONISH.match(text):
@@ -63,7 +63,7 @@ def observe(text, pending=None):
         notes.append("they ended on a question mark")
 
     if len(text.split()) > 12:
-        notes.append("that's a long message — likely an argument or an aside, not a word")
+        notes.append("that's a long message - likely an argument or an aside, not a word")
 
     return "; ".join(notes)
 

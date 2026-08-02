@@ -1,11 +1,11 @@
-"""Learned taste — which kinds of links the human likes.
+"""Learned taste - which kinds of links the human likes.
 
 A preference is a link: `from -> to`, the pair the AI played. Thumbs-up on a bot word
 means "more leaps like that"; thumbs-down means "fewer".
 
 The client owns this. It stores the pairs (localStorage) and sends them on every turn,
 so taste survives instance recycles, deploys, and a wiped backend, and it stays private
-to that browser. The engine only formats them into the prompt — it never persists
+to that browser. The engine only formats them into the prompt - it never persists
 anything.
 
 Capped, because this rides in the prompt on every single turn and an unbounded list
@@ -37,7 +37,7 @@ class Preferences:
         parts = []
         if self.liked:
             parts.append(
-                "Links this human LIKED (they enjoy this kind of leap — prefer moves "
+                "Links this human LIKED (they enjoy this kind of leap - prefer moves "
                 "of this shape when one is legal):\n"
                 + "\n".join(f"  - {a} -> {b}" for a, b in self.liked)
             )

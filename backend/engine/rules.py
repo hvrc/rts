@@ -16,8 +16,8 @@ RTS_LETTERS = ("r", "t", "s")
 class LetterRule:
     """The rule that names the game.
 
-    normal   — a word may NOT start with r/t/s.
-    reversed — a word may ONLY start with r/t/s.
+    normal   - a word may NOT start with r/t/s.
+    reversed - a word may ONLY start with r/t/s.
 
     Same rule object governs the human's word, the AI's word, and every candidate in
     the train of thought, so the two modes can never drift apart.
@@ -46,7 +46,7 @@ class LetterRule:
     def allowed_letters(self):
         """The letters a legal word may start with, spelled out.
 
-        Telling the model to "think harder" doesn't work — it fixates on the banned
+        Telling the model to "think harder" doesn't work - it fixates on the banned
         letters it already thought of (loud -> sound/siren/scream/shout, all "s") and
         concedes. Handing it the letters it CAN use turns a vague nudge into a concrete
         constraint it can actually search against.
@@ -64,12 +64,12 @@ def is_single_word(text):
 def looks_like_duplicate(word, used):
     """Would anyone actually call this word a repeat?
 
-    A repeat is the SAME word, or a trivial variation of it — dog/dogs, run/running.
+    A repeat is the SAME word, or a trivial variation of it - dog/dogs, run/running.
     Two *different* words that happen to mean similar things are not repeats: "win" and
     "victory" are two words, and both are legal.
 
     This exists as a veto over the model. Repeating is now a losing move, so a model
-    that calls a synonym a duplicate ends the game on a perfectly legal play — which is
+    that calls a synonym a duplicate ends the game on a perfectly legal play - which is
     exactly what it did. Duplicate detection is deterministic; the model doesn't get a
     vote it can't be trusted with.
 
@@ -85,7 +85,7 @@ def looks_like_duplicate(word, used):
 def is_variation(word, used):
     """Cheap trivial-variation check (plural / simple tense) against used words.
 
-    Not exhaustive — see looks_like_duplicate for the fuzzier backstop.
+    Not exhaustive - see looks_like_duplicate for the fuzzier backstop.
     """
     w = (word or "").lower()
     if w in used:

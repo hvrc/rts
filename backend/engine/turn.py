@@ -2,13 +2,13 @@
 
 The shape of a turn, and the only place the pieces meet:
 
-  1. deterministic pre-checks   — free, reliable, never wrong (rules.py)
-  2. ask the brain              — one structured call (providers/)
-  3. deterministic post-checks  — the AI must obey the rules too; one retry, else concede
-  4. advance the game           — (state.py) and shape the reply (contract.py)
+  1. deterministic pre-checks   - free, reliable, never wrong (rules.py)
+  2. ask the brain              - one structured call (providers/)
+  3. deterministic post-checks  - the AI must obey the rules too; one retry, else concede
+  4. advance the game           - (state.py) and shape the reply (contract.py)
 
 Steps 1 and 3 exist because the letter rule and duplicate detection must be 100%
-reliable and a model is not. Everything else is the model's job — including, now, the
+reliable and a model is not. Everything else is the model's job - including, now, the
 wording of a rule break, which the model phrases and the post-check enforces.
 
 Breaking the letter rule or replaying a word doesn't end anything. It's called, recorded
@@ -17,7 +17,7 @@ repair means an honest mistype would otherwise kill a good chain. Only giving up
 game, and only conceding wipes the board.
 
 Rounds are lost by dropping an argument, never by having one. Asking "how?" and arguing
-back both cost nothing. What costs is walking away — saying so, asking for a fresh word
+back both cost nothing. What costs is walking away - saying so, asking for a fresh word
 instead of answering, or quietly playing something else while a question is still open.
 That last one is why `pending` exists.
 """
@@ -34,7 +34,7 @@ def play(player_input, game_id=SOLO_ID, reverse=False, preferences=None):
     Both sides of the exchange are recorded afterwards, not before: the prompt already
     carries the human's current message in its own block, so remembering it up front
     would send it twice. A loss or restart mid-turn swaps the Game object, hence the
-    re-fetch — the transcript survives that swap, the board doesn't.
+    re-fetch - the transcript survives that swap, the board doesn't.
     """
     payload = _play(player_input, game_id, reverse, preferences)
 
@@ -43,7 +43,7 @@ def play(player_input, game_id=SOLO_ID, reverse=False, preferences=None):
     game.remember("assistant", payload.get("response", ""))
 
     # Along for the ride, deliberately unmentioned. The bot never brings the score up and
-    # nothing is obliged to render it — but it's tracked from the first turn, so whatever
+    # nothing is obliged to render it - but it's tracked from the first turn, so whatever
     # decides to show it later has a history to show rather than starting from zero.
     payload["score"] = history.score(game.history, "human")
     return payload
@@ -66,7 +66,7 @@ def _play(player_input, game_id, reverse, preferences):
         return contract.contract("INVALID", "?")
 
     # Breaking the letter rule or replaying a word no longer ends the game. It gets
-    # called, recorded, and play continues — partly because ending a game over a slip is
+    # called, recorded, and play continues - partly because ending a game over a slip is
     # miserable, and mostly because typo repair means a mistyped "sorange" would otherwise
     # kill a good chain. It still costs: the event lands in the history and shows up in
     # the score, whether or not anyone mentions it at the time.
@@ -95,7 +95,7 @@ def _play(player_input, game_id, reverse, preferences):
     if broke_rule:
         note = (f'"{text.lower()}" starts with a banned letter under the rule in force. '
                 "Say so briefly and ask for another word. Do not play a word of your own "
-                "— the chain doesn't move. Nobody has lost; they just go again.")
+                "- the chain doesn't move. Nobody has lost; they just go again.")
     elif repeated:
         note = (f'"{text.lower()}" is already in the chain. Say so briefly and ask for '
                 "another. Do not play a word of your own. Nobody has lost.")
@@ -120,20 +120,20 @@ def _play(player_input, game_id, reverse, preferences):
 
     # The single-word override that used to live here is gone. It forced any one-word
     # message to be a move, because without conversation history the model had no way to
-    # tell "bro" opening a game from "what" answering a question — so it guessed, badly,
+    # tell "bro" opening a game from "what" answering a question - so it guessed, badly,
     # and this rule overruled it whichever way it guessed. The model can see the
     # transcript now, which is the actual fix; forcing the answer on top of that would
     # just reintroduce the bug it was papering over.
 
     # Veto a bogus duplicate call. Repeating is a losing move now, so a model that
     # mistakes a synonym for a repeat ("win's basically victory") ends the game on a
-    # legal play. Duplicates are deterministic — if the word isn't actually one, the
+    # legal play. Duplicates are deterministic - if the word isn't actually one, the
     # model doesn't get to say it is.
     if code == "DUPLICATE" and not rules.looks_like_duplicate(text.lower(), game.used):
         try:
             data = _ask(game, text, taste=taste, spent=spent,
                         correction="that word has NOT been played. A different word that "
-                                   "happens to mean something similar is NOT a repeat — "
+                                   "happens to mean something similar is NOT a repeat - "
                                    "only the same word, or a plural/tense of it, is. "
                                    "Accept the move and play on.")
         except Exception as e:
@@ -145,7 +145,7 @@ def _play(player_input, game_id, reverse, preferences):
     # easily. That was true of a model reasoning with thinking switched off, and the retry
     # made it worse in a subtler way: conceding became so expensive that the bot would
     # rather play a word it couldn't defend. Losing honestly is cheaper than that, and the
-    # prompt now says so. If it starts folding early again, raise RTS_EFFORT — that's the
+    # prompt now says so. If it starts folding early again, raise RTS_EFFORT - that's the
     # dial for "think harder before giving up", not a second round-trip.
 
     # Settle any open question before acting on this turn. This has to happen before the
@@ -169,7 +169,7 @@ def _play(player_input, game_id, reverse, preferences):
 
     # --- the human asked to start over, or asked the AI to open ---
     # Asking for a fresh word while you owe an answer is a way of dropping the argument,
-    # so it's recorded as giving up the round — same as saying so out loud. Asking for one
+    # so it's recorded as giving up the round - same as saying so out loud. Asking for one
     # in open play costs nothing.
     if code == "RESTART":
         if game.pending and game.pending.asked_by == "bot":
@@ -180,12 +180,12 @@ def _play(player_input, game_id, reverse, preferences):
     # --- genuinely cornered: it gives up the round, and the game restarts ---
     if code == "CONCEDE":
         game.history.record(history.CONCEDED, "bot", game.last_word, history.EXPLICIT)
-        return _lose(game_id, rule, "CONCEDE", reply or "ok, you got me. new game — go")
+        return _lose(game_id, rule, "CONCEDE", reply or "ok, you got me. new game - go")
 
     # --- a real repeat the deterministic pre-check couldn't see (an irregular plural,
     #     or a word buried in prose) ---
     if code == "DUPLICATE":
-        return _lose(game_id, rule, "DUPLICATE", reply or "already played. you lose. new game — go")
+        return _lose(game_id, rule, "DUPLICATE", reply or "already played. you lose. new game - go")
 
     # --- 3. deterministic post-checks on the AI's own word ---
     if code == "OK":
@@ -203,12 +203,12 @@ def _play(player_input, game_id, reverse, preferences):
 
             if code != "OK" or not _legal(chosen, rule, spent):
                 # Cornered even after a retry. The AI loses; new game.
-                return _lose(game_id, rule, "CONCEDE", "ok, you got me. new game — go")
+                return _lose(game_id, rule, "CONCEDE", "ok, you got me. new game - go")
 
         # --- 4. legal both ways: advance the chain ---
         # What they *played*, not what they typed. Falls back to the raw text only when
         # the model didn't name a word, and skips it entirely if that fallback isn't a
-        # bare word — better a gap in the chain than "how?" sitting in it as a move.
+        # bare word - better a gap in the chain than "how?" sitting in it as a move.
         played = _clean(data.get("their_word")) or text.lower()
 
         if rules.is_single_word(played):
@@ -229,7 +229,7 @@ def _play(player_input, game_id, reverse, preferences):
                                  link={"from": played, "to": chosen})
 
     # Non-advancing, non-losing: UNRELATED / INVALID / CHAT. The board is unchanged,
-    # and any open question stays open — a question or an aside doesn't settle it.
+    # and any open question stays open - a question or an aside doesn't settle it.
     return contract.contract(code, reply or "?", [])
 
 
@@ -243,7 +243,7 @@ def reset(game_id=SOLO_ID, reverse=False):
 # internals
 # ---------------------------------------------------------------------------
 def _lose(game_id, rule, code, message):
-    """Somebody broke a rule or got cornered. Wipe the board and start again — the
+    """Somebody broke a rule or got cornered. Wipe the board and start again - the
     letter rule carries over, since that's a client toggle, not part of the game."""
     GAMES.reset(game_id, rule.reverse)
     return contract.contract(code, message, new_game=True)
@@ -255,7 +255,7 @@ def _restart(game_id, rule, data, reply):
 
     chosen = _clean(data.get("chosen_word"))
     if not chosen or rule.rejects(chosen):
-        # It didn't hand us a usable opener — start the game anyway and let them lead.
+        # It didn't hand us a usable opener - start the game anyway and let them lead.
         return contract.contract("RESTART", reply or "new game. you go first", new_game=True)
 
     game.add(chosen)
@@ -267,13 +267,13 @@ def _settle_pending(game, data, text, code):
     """Close out an open question, if this turn closed it.
 
     Three ways it ends. They argued for the word and the argument landed, so the reason
-    gets stored on the link — that's what "how?" reads later instead of inventing a fresh
+    gets stored on the link - that's what "how?" reads later instead of inventing a fresh
     explanation. They argued and it didn't land. Or they said nothing about it and played
     a different word instead, which is the quiet way of giving up a round: nobody
     announces it, and it counts the same as saying so.
 
     A question or an aside settles nothing and leaves it open, which is the point of
-    having this at all — the conversation can wander and come back.
+    having this at all - the conversation can wander and come back.
     """
     pending = game.pending
     if not pending or pending.asked_by != "bot":
@@ -294,7 +294,7 @@ def _settle_pending(game, data, text, code):
         game.history.record(history.CONCEDED, "human", pending.word, history.ABANDONED)
     elif code == "UNRELATED":
         game.history.record(history.REJECTED, "human", pending.word)
-        return                              # still unsettled — they can try again
+        return                              # still unsettled - they can try again
     elif code == "OK":
         game.history.record(history.JUSTIFIED, "human", pending.word)
         link = game.history.find_link(pending.word)

@@ -1,6 +1,6 @@
 """Prompt assembly.
 
-No prompt text lives in Python. Everything the model reads is in prompts/*.md — edit
+No prompt text lives in Python. Everything the model reads is in prompts/*.md - edit
 those to change how the bot plays, and nothing here needs to be touched.
 
   prompts/identity.md      who the bot is. persona and epistemics. no rules.
@@ -36,7 +36,7 @@ def _read(name):
 def system_prompt(rule):
     """The full system prompt, with the active letter rule spliced in.
 
-    Stable for the whole session — nothing per-turn belongs in here.
+    Stable for the whole session - nothing per-turn belongs in here.
     """
     rule_block = _read("letter_rule.reverse.md" if rule.reverse else "letter_rule.normal.md")
     return "\n\n".join(_read(name) for name in _LAYERS).replace(
@@ -49,7 +49,7 @@ def messages(game, player_input, correction=None, preferences=None):
 
     Real message history, rather than a synthesised description of it. Without this the
     bot reads every message cold, and "what" arriving after one of its own questions looks
-    identical to "what" opening a game — which is exactly how a bare "what" ends up played
+    identical to "what" opening a game - which is exactly how a bare "what" ends up played
     as a move.
 
     The board rides in the final user message rather than the system prompt: it changes
@@ -68,15 +68,15 @@ def _turn_block(game, player_input, correction=None, preferences=None):
     lines = [
         "<board>",
         "chain: " + (" -> ".join(game.chain) if game.chain
-                     else "(empty — nothing played yet this game)"),
+                     else "(empty - nothing played yet this game)"),
         "already played, cannot be replayed: "
         + (", ".join(sorted(game.used)) if game.used else "(nothing)"),
         # Worded neutrally on purpose. This block is resent every single turn, so any
-        # phrasing in it becomes the phrasing the bot reaches for — "they must connect to"
+        # phrasing in it becomes the phrasing the bot reaches for - "they must connect to"
         # was priming a stock question ("X? how's that connect to Y") that no amount of
         # telling it to vary could shift.
         "word in play: "
-        + (game.last_word or "(nothing yet — any legal word opens)"),
+        + (game.last_word or "(nothing yet - any legal word opens)"),
         "</board>",
     ]
 
@@ -90,12 +90,12 @@ def _turn_block(game, player_input, correction=None, preferences=None):
             f"you asked how {p.word!r} connects to {p.frm!r} and they haven't settled it "
             "yet. Read what they just said as their answer to that.",
             "If they've argued for it, judge the argument. If they've dropped it and "
-            "played something else instead, that's them giving up the round — take the "
+            "played something else instead, that's them giving up the round - take the "
             "new word and move on without making a thing of it.",
             "</open_question>",
         ]
 
-    # Shown rather than described, because being told to vary the phrasing doesn't work —
+    # Shown rather than described, because being told to vary the phrasing doesn't work -
     # the same sentence comes back with one word swapped. Seeing the actual repetition does.
     asked = game.history.asks[-4:]
     if asked:
@@ -121,7 +121,7 @@ def _turn_block(game, player_input, correction=None, preferences=None):
     lines += ["", f'they just said: "{player_input}"']
 
     # Observations, not instructions. The last thing that read the shape of a message
-    # decided from it, and forced any single word to be a move — right often enough to
+    # decided from it, and forced any single word to be a move - right often enough to
     # look fine, wrong exactly where it mattered. Noticing is safe; concluding wasn't.
     noticed = reading.observe(player_input, game.pending)
     if noticed:

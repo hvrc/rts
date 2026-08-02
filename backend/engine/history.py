@@ -1,14 +1,14 @@
 """What outlives a game.
 
 A game is a board: a chain, a set of spent words, whose turn it is. It gets wiped
-constantly — every loss, every restart. The conversation around it doesn't. The two
+constantly - every loss, every restart. The conversation around it doesn't. The two
 players are still talking, the messages are still on screen, and what happened three
 games ago still counts.
 
 So this holds the durable half: what was said, what happened, and which links were
 argued over. `Game` keeps the board and hands this object to its successor.
 
-Everything derived — score, how much the bot should trust a justification — is a
+Everything derived - score, how much the bot should trust a justification - is a
 projection over `events` rather than a counter kept alongside it. That's deliberate.
 Counters have to be updated correctly at every call site and they rot the moment the rule
 changes; a projection is a pure function you can rewrite in one place. Scoring rules here
@@ -20,7 +20,7 @@ are expected to change, so nothing downstream should depend on how they're compu
 MOVE = "move"                      # a word was played and accepted
 RULE_BREAK = "rule_break"          # started with a banned letter
 REPEAT = "repeat"                  # word already in the chain
-CHALLENGED = "challenged"          # somebody asked "how?" — costs nothing, see below
+CHALLENGED = "challenged"          # somebody asked "how?" - costs nothing, see below
 DEFENDED = "defended"              # they answered the challenge
 JUSTIFIED = "justified"            # ...and the answer landed
 REJECTED = "rejected"              # ...and it didn't
@@ -28,7 +28,7 @@ ON_FAITH = "on_faith"              # accepted without seeing it. counted, quietl
 CONCEDED = "conceded"              # gave up the round
 
 # Why a round was given up. Asking is free and arguing is free; dropping the argument is
-# what costs you. ABANDONED covers the silent version — a live challenge against your word
+# what costs you. ABANDONED covers the silent version - a live challenge against your word
 # and you play something new instead of answering it.
 EXPLICIT = "explicit"              # "ok you got me"
 ABANDONED = "abandoned_challenge"  # walked away from an open question
@@ -40,7 +40,7 @@ class Event:
 
     def __init__(self, kind, player, word=None, reason=None):
         self.kind = kind
-        self.player = player          # "human" or "bot" — the one it happened TO
+        self.player = player          # "human" or "bot" - the one it happened TO
         self.word = word
         self.reason = reason
 
@@ -96,12 +96,12 @@ class History:
     """The durable half of a session. Survives every reset the board doesn't."""
 
     def __init__(self):
-        self.transcript = []          # [(role, text)] — what was said
-        self.events = []              # [Event]        — what happened
-        self.links = []               # [Link]         — what was argued over
+        self.transcript = []          # [(role, text)] - what was said
+        self.events = []              # [Event]        - what happened
+        self.links = []               # [Link]         - what was argued over
 
         # Every question the bot has asked, verbatim. Kept because telling a model to
-        # "vary your phrasing" does almost nothing — it has a strong prior for one shape
+        # "vary your phrasing" does almost nothing - it has a strong prior for one shape
         # and reaches for it every time, swapping a synonym in when the shape is banned.
         # Showing it what it actually said works where the instruction didn't.
         self.asks = []
@@ -127,7 +127,7 @@ class History:
 def score(history, player):
     """Rounds lost, and why. Nobody is shown this unless they ask for it.
 
-    A round is lost by giving it up — saying so, or walking away from an open question,
+    A round is lost by giving it up - saying so, or walking away from an open question,
     or asking for a fresh word rather than finishing the one you're on. Asking and
     arguing are free, and deliberately so: questioning is how the game is played, and
     charging for it would teach people not to.
@@ -149,7 +149,7 @@ def track_record(history, player="human"):
     Feeds the bot's read on a thin justification. Note what it counts and what it doesn't:
     challenges *raised* are not held against anyone, because playing a word the bot hasn't
     met is normal and the whole point. What counts is arguments that were made and didn't
-    hold — and, quietly, links accepted without ever really being seen.
+    hold - and, quietly, links accepted without ever really being seen.
     """
     return {
         "moves": _count(history, MOVE, player),
@@ -164,7 +164,7 @@ def describe_track_record(history, player="human"):
     """The track record as a line for the prompt, or "" when there's nothing to say.
 
     Prose rather than a number on purpose. A number invites the model to treat it as a
-    threshold and start refusing things at 0.7; a description is read as what it is — a
+    threshold and start refusing things at 0.7; a description is read as what it is - a
     prior about how the arguing has gone, not a rule about what to accept.
     """
     r = track_record(history, player)
@@ -183,7 +183,7 @@ def describe_track_record(history, player="human"):
 
     return (
         ", ".join(bits)
-        + ". Worth a closer read of the next explanation — but this is about their "
+        + ". Worth a closer read of the next explanation - but this is about their "
           "arguments, not their words. An unfamiliar word is still just an unfamiliar "
           "word."
     )
